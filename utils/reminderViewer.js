@@ -15,8 +15,11 @@ async function handleReminderView(message) {
         sent: { $ne: true }
     });
 
+    // Only get active (non-expired) reminders
+    const now = new Date();
     const reminders = await Reminder.find({
-        sent: { $ne: true }
+        sent: { $ne: true },
+        remindAt: { $gte: now }
     }).sort({ remindAt: 1 });
     
     if (reminders.length === 0) {
@@ -65,8 +68,6 @@ async function sendReminderPage(message, userId, page, filter, allReminders, int
         const lines = await Promise.all(pageReminders.map(async r => {
             const time = Math.floor(r.remindAt.getTime() / 1000);
             const typeName = typeNames[r.type] || r.type;
-            const isExpired = r.remindAt.getTime() < now;
-            const expiredTag = isExpired ? ' **[EXPIRED]**' : '';
             
             // Get DM status
             const userSettings = await getUserSettings(r.userId);
@@ -74,7 +75,7 @@ async function sendReminderPage(message, userId, page, filter, allReminders, int
             const dmEnabled = userSettings?.[dmField] || false;
             const dmStatus = dmEnabled ? '✅ DM' : '❌ DM';
             
-            return `**${typeName}** | <@${r.userId}> - <t:${time}:R>${expiredTag} | ${dmStatus}`;
+            return `**${typeName}** | <@${r.userId}> - <t:${time}:R> | ${dmStatus}`;
         }));
         embed.setDescription(lines.join('\n'));
     }
@@ -140,7 +141,8 @@ async function handleReminderInteraction(interaction) {
     }
 
     const reminders = await Reminder.find({
-        sent: { $ne: true }
+        sent: { $ne: true },
+        remindAt: { $gte: new Date() }
     }).sort({ remindAt: 1 });
 
     if (['expedition', 'stamina', 'raid', 'raidSpawn', 'drop'].includes(action)) {

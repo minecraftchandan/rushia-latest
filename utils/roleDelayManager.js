@@ -36,8 +36,8 @@ function formatDelay(ms) {
 }
 
 async function handleRoleDelay(message, args) {
-  // Check permissions
-  if (message.author.id !== BOT_OWNER_ID && !message.member.permissions.has('ManageGuild')) {
+  // Check permissions - bot owner or server admin only
+  if (message.author.id !== BOT_OWNER_ID && !message.member?.permissions.has('ManageGuild')) {
     return message.reply('❌ Only bot owner or server admins can set role delays.');
   }
 
@@ -121,6 +121,11 @@ function getRoleDelay(settings, roleId) {
  * View all configured role delays
  */
 async function handleViewDelays(message) {
+  // Check permissions - bot owner or server admin only
+  if (message.author.id !== BOT_OWNER_ID && !message.member?.permissions.has('ManageGuild')) {
+    return message.reply('❌ Only bot owner or server admins can view role delays.');
+  }
+
   if (!message.guild) {
     return message.reply('❌ This command can only be used in a server.');
   }
