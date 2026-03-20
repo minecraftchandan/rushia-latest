@@ -83,7 +83,22 @@ async function checkWishlistAndPing(message, raidName, element) {
     if (usersWithWishlist.length > 0) {
       const mentions = usersWithWishlist.map(w => `<@${w._id}>`).join(' ');
       const emoji = ELEMENT_EMOJIS[element] || element;
+      
+      // Send channel mention (existing functionality)
       message.channel.send(`${mentions} Your wishlisted raid **${raidName}** ${emoji} has spawned!`).catch(() => {});
+      
+      // Send individual DMs to each user
+      const spawnerUserId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
+      const spawnerMention = spawnerUserId ? `<@${spawnerUserId}>` : 'someone';
+      
+      for (const user of usersWithWishlist) {
+        try {
+          const discordUser = await message.client.users.fetch(user._id);
+          await discordUser.send(`Your wishlist raid **${raidName}** ${emoji} has spawned by ${spawnerMention}!`);
+        } catch (dmError) {
+          // Silently fail if DM can't be sent (user has DMs disabled, etc.)
+        }
+      }
     }
   } catch (error) {
     console.error('Wishlist error:', error.message);

@@ -46,45 +46,45 @@ module.exports = {
                 return;
             }
             
-            if (content.toLowerCase() === 'help') {
+            if (content.match(/^help$/i)) {
                 const { handleHelpCommand } = require('../commands/help');
                 await handleHelpCommand(message);
                 return;
             }
             
-            if (content.toLowerCase() === 'logs') {
+            if (content.match(/^logs$/i)) {
                 const { handleLogsCommand } = require('../commands/logs');
                 await handleLogsCommand(message);
                 return;
             }
             
-            if (content.toLowerCase() === 'perms') {
+            if (content.match(/^perms$/i)) {
                 const { handlePermsCheck } = require('../utils/permsChecker');
                 await handlePermsCheck(message);
                 return;
             }
             
-            if (content.toLowerCase() === 'stats') {
+            if (content.match(/^stats$/i)) {
                 const { handleStatsCommand } = require('../systems/healthWebhookSystem');
                 await handleStatsCommand(message);
                 return;
             }
             
-            if (content.toLowerCase() === 'rem' || content.toLowerCase().startsWith('rem ')) {
+            if (content.match(/^rem(?:\s|$)/i)) {
                 const { handleReminderView } = require('../utils/reminderViewer');
-                const args = content.toLowerCase().split(' ');
-                const filter = args[1] || null;
+                const args = content.toLowerCase().replace(/^rem\s*/i, '').trim();
+                const filter = args || null;
                 await handleReminderView(message, filter);
                 return;
             }
             
-            if (content.toLowerCase() === 'nv' || content.toLowerCase().startsWith('nv ')) {
+            if (content.match(/^nv(?:\s|$)/i)) {
                 const { handleNotificationViewCommand } = require('../systems/userNotificationSystem');
                 await handleNotificationViewCommand(message);
                 return;
             }
             
-            if (content.toLowerCase() === 'servers' || content.toLowerCase() === 'guilds') {
+            if (content.match(/^(?:servers|guilds)$/i)) {
                 const { handleServerListCommand } = require('../systems/serverManagementSystem');
                 await handleServerListCommand(message);
                 return;
@@ -98,14 +98,14 @@ module.exports = {
                 return;
             }
             
-            if (content.toLowerCase() === 'rlb') {
+            if (content.match(/^(?:rlb|lb)$/i)) {
                 const { handleRlbCommand } = require('../systems/rlbSystem');
                 await handleRlbCommand(message);
                 return;
             }
             
             // Test command: @bot test
-            if (content.toLowerCase() === 'test') {
+            if (content.match(/^test$/i)) {
                 const { handleTestCommand } = require('../utils/testSimulator');
                 await handleTestCommand(message);
                 return;
@@ -121,7 +121,7 @@ module.exports = {
             }
             
             // View role delays: @bot delays or @bot viewdelays
-            if (content.toLowerCase() === 'delays' || content.toLowerCase() === 'viewdelays') {
+            if (content.match(/^(?:delays|viewdelays)$/i)) {
                 const { handleViewDelays } = require('../utils/roleDelayManager');
                 await handleViewDelays(message);
                 return;
@@ -135,14 +135,114 @@ module.exports = {
             }
         }
         
-        // Handle prefix commands
+        // Handle prefix commands (r prefix without @Bot mention)
         if (!message.author.bot && message.content.toLowerCase().startsWith('r')) {
             const args = message.content.slice(1).trim().split(/\s+/);
             const command = args[0]?.toLowerCase();
             
-            if (command === 'lb') {
+            // Wishlist commands
+            if (command === 'wa' && args[1]) {
+                const { handleWishlistAdd } = require('../systems/wishlistSystem');
+                await handleWishlistAdd(message, args.slice(1).join(' '));
+                return;
+            }
+            
+            if (command === 'wl') {
+                const { handleWishlistView } = require('../systems/wishlistSystem');
+                const targetId = args[1]?.replace(/[<@!>]/g, '');
+                const targetUser = targetId ? await client.users.fetch(targetId).catch(() => null) : null;
+                await handleWishlistView(message, targetUser);
+                return;
+            }
+            
+            if (command === 'wr' && args[1]) {
+                const { handleWishlistRemove } = require('../systems/wishlistSystem');
+                await handleWishlistRemove(message, args.slice(1).join(' '));
+                return;
+            }
+            
+            // Information commands
+            if (command === 'help') {
+                const { handleHelpCommand } = require('../commands/help');
+                await handleHelpCommand(message);
+                return;
+            }
+            
+            if (command === 'logs') {
+                const { handleLogsCommand } = require('../commands/logs');
+                await handleLogsCommand(message);
+                return;
+            }
+            
+            if (command === 'perms') {
+                const { handlePermsCheck } = require('../utils/permsChecker');
+                await handlePermsCheck(message);
+                return;
+            }
+            
+            if (command === 'stats') {
+                const { handleStatsCommand } = require('../systems/healthWebhookSystem');
+                await handleStatsCommand(message);
+                return;
+            }
+            
+            if (command === 'rem') {
+                const { handleReminderView } = require('../utils/reminderViewer');
+                const filter = args[1] || null;
+                await handleReminderView(message, filter);
+                return;
+            }
+            
+            if (command === 'nv') {
+                const { handleNotificationViewCommand } = require('../systems/userNotificationSystem');
+                await handleNotificationViewCommand(message);
+                return;
+            }
+            
+            // Server management
+            if (command === 'servers' || command === 'guilds') {
+                const { handleServerListCommand } = require('../systems/serverManagementSystem');
+                await handleServerListCommand(message);
+                return;
+            }
+            
+            if ((command === 'info' || command === 'i' || command === 'in' || command === 'inf') && args[1]) {
+                const { handleServerInfoCommand } = require('../systems/serverManagementSystem');
+                await handleServerInfoCommand(message, args[1]);
+                return;
+            }
+            
+            // Leaderboard
+            if (command === 'lb' || command === 'rlb') {
                 const { handleRlbCommand } = require('../systems/rlbSystem');
                 await handleRlbCommand(message);
+                return;
+            }
+            
+            // Test
+            if (command === 'test') {
+                const { handleTestCommand } = require('../utils/testSimulator');
+                await handleTestCommand(message);
+                return;
+            }
+            
+            // Role delays
+            if ((command === 'delay' || command === 'd') && args[1]) {
+                const { handleRoleDelay } = require('../utils/roleDelayManager');
+                await handleRoleDelay(message, args.slice(1));
+                return;
+            }
+            
+            if (command === 'delays' || command === 'viewdelays') {
+                const { handleViewDelays } = require('../utils/roleDelayManager');
+                await handleViewDelays(message);
+                return;
+            }
+            
+            // Card search
+            if ((command === 'f' || command === 'find') && args[1]) {
+                const cardSearch = require('../systems/cardSearchSystem');
+                await cardSearch.handleSearch(message, args.slice(1).join(' '));
                 return;
             }
         }

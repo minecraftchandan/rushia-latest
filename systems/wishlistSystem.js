@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { EmbedBuilder } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
+const { searchCards } = require('./improvedSearch');
 
 let cardsCache = null;
 let wishlistConn = null;
@@ -30,63 +31,10 @@ function getCards() {
   return cardsCache;
 }
 
-function levenshteinDistance(a, b) {
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      matrix[i][j] = b.charAt(i - 1) === a.charAt(j - 1)
-        ? matrix[i - 1][j - 1]
-        : Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
-    }
-  }
-  return matrix[b.length][a.length];
-}
-
 const pendingConfirmations = new Map();
 
 function findSimilarCards(name, allCards) {
-  const nameLower = name.toLowerCase().trim();
-  if (!nameLower) return [];
-  
-  const containsMatches = allCards.filter(c => c.name.toLowerCase().includes(nameLower));
-  if (containsMatches.length > 0) return containsMatches;
-  
-  const searchWords = nameLower.split(/\s+/).filter(w => w.length > 0);
-  const allWordsMatches = allCards.filter(c => {
-    const cardNameLower = c.name.toLowerCase();
-    return searchWords.every(word => cardNameLower.includes(word));
-  });
-  if (allWordsMatches.length > 0) return allWordsMatches;
-  
-  const anyWordExactMatches = allCards.filter(c => {
-    const cardWords = c.name.toLowerCase().split(/\s+/);
-    return searchWords.some(sw => cardWords.includes(sw));
-  });
-  if (anyWordExactMatches.length > 0) return anyWordExactMatches;
-  
-  const anyWordPartialMatches = allCards.filter(c => {
-    const cardWords = c.name.toLowerCase().split(/\s+/);
-    return searchWords.some(sw => cardWords.some(cw => cw.includes(sw) || sw.includes(cw)));
-  });
-  if (anyWordPartialMatches.length > 0) return anyWordPartialMatches;
-  
-  const threshold = nameLower.length <= 3 ? 1 : nameLower.length <= 6 ? 2 : 3;
-  const fuzzyMatches = allCards
-    .map(card => ({
-      card,
-      distance: levenshteinDistance(nameLower, card.name.toLowerCase())
-    }))
-    .filter(m => m.distance <= threshold)
-    .sort((a, b) => a.distance - b.distance);
-  
-  if (fuzzyMatches.length > 0) {
-    const minDistance = fuzzyMatches[0].distance;
-    return fuzzyMatches.filter(m => m.distance === minDistance).map(m => m.card);
-  }
-  
-  return [];
+  return searchCards(name, allCards, 100); // Return up to 100 matches for pagination
 }
 
 async function initWishlistConnection() {
@@ -151,9 +99,7 @@ async function handleWishlistAdd(message, cardNames) {
     const multipleMatches = [];
     
     for (const name of namesToAdd) {
-      const matches = allCards.filter(card => 
-        card.name.toLowerCase().includes(name.toLowerCase())
-      );
+      const matches = findSimilarCards(name, allCards);
       
       if (matches.length === 0) {
         results.push({ name, status: 'not_found' });
@@ -167,7 +113,7 @@ async function handleWishlistAdd(message, cardNames) {
           results.push({ name, status: 'added', card });
         }
       } else {
-        multipleMatches.push({ name, matches: matches.slice(0, 5) });
+        multipleMatches.push({ name, matches: matches.slice(0, 10) });
       }
     }
     
@@ -222,12 +168,12 @@ async function handleWishlistAdd(message, cardNames) {
         const embed = new EmbedBuilder()
           .setColor(0xffaa00)
           .setTitle('Multiple cards found')
-          .setDescription(`Found ${totalMatches} card${totalMatches > 1 ? 's' : ''}${hasMore ? ` (showing 1-${displayLimit})` : ''}. Reply with the number to select:\n\n` +
+          .setDescription(`Found ${totalMatches} card${totalMatches > 1 ? 's' : ''} (showing 1-${Math.min(displayLimit, totalMatches)}). Reply with the number to select:\n\n` +
             displayMatches.map((c, i) => {
               const emoji = ELEMENT_EMOJIS[c.element.toLowerCase()] || c.element;
-              return `**${i + 1}.** ${c.name} ${emoji} - ${c.series} (${c.role})`;
+              return `**${i + 1}.** \`${c.name}\` ${emoji} - ${c.series} (${c.role})`;
             }).join('\n'))
-          .setFooter({ text: 'Reply with 1, 2, 3... or "cancel"' });
+          .setFooter({ text: `Page 1/${Math.ceil(totalMatches / displayLimit)} • Reply with 1-${displayMatches.length} or "cancel"` });
         
         const components = [];
         if (hasMore) {
@@ -238,6 +184,7 @@ async function handleWishlistAdd(message, cardNames) {
                 .setCustomId(`wishlist_next_${message.author.id}`)
                 .setLabel('Next →')
                 .setStyle(ButtonStyle.Primary)
+                .setDisabled(false)
             );
           components.push(row);
         }
@@ -254,7 +201,7 @@ async function handleWishlistAdd(message, cardNames) {
           timestamp: Date.now()
         });
         
-        setTimeout(() => pendingConfirmations.delete(message.author.id), 60000);
+        setTimeout(() => pendingConfirmations.delete(message.author.id), 120000);
         return;
       } else {
         // Multiple queries with multiple matches - just report them
@@ -418,6 +365,9 @@ async function handleWishlistPagination(interaction) {
     pending.page--;
   }
   
+  // Ensure page is within bounds
+  pending.page = Math.max(0, Math.min(pending.page, pending.totalPages - 1));
+  
   const startIndex = pending.page * displayLimit;
   const endIndex = Math.min(startIndex + displayLimit, pending.matches.length);
   pending.displayMatches = pending.matches.slice(startIndex, endIndex);
@@ -430,34 +380,31 @@ async function handleWishlistPagination(interaction) {
     .setDescription(`Found ${pending.matches.length} cards (showing ${startIndex + 1}-${endIndex}). Reply with the number to select:\n\n` +
       pending.displayMatches.map((c, i) => {
         const emoji = ELEMENT_EMOJIS[c.element.toLowerCase()] || c.element;
-        return `**${i + 1}.** ${c.name} ${emoji} - ${c.series} (${c.role})`;
+        return `**${i + 1}.** \`${c.name}\` ${emoji} - ${c.series} (${c.role})`;
       }).join('\n'))
-    .setFooter({ text: 'Reply with 1, 2, 3... or "cancel"' });
+    .setFooter({ text: `Page ${pending.page + 1}/${pending.totalPages} • Reply with 1-${pending.displayMatches.length} or "cancel"` });
   
   const components = [];
   const row = new ActionRowBuilder();
   
-  if (pending.page > 0) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`wishlist_prev_${interaction.user.id}`)
-        .setLabel('← Previous')
-        .setStyle(ButtonStyle.Primary)
-    );
-  }
+  // Always show both buttons, but disable when at boundaries
+  row.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`wishlist_prev_${interaction.user.id}`)
+      .setLabel('← Previous')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(pending.page === 0)
+  );
   
-  if (endIndex < pending.matches.length) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`wishlist_next_${interaction.user.id}`)
-        .setLabel('Next →')
-        .setStyle(ButtonStyle.Primary)
-    );
-  }
+  row.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`wishlist_next_${interaction.user.id}`)
+      .setLabel('Next →')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(endIndex >= pending.matches.length)
+  );
   
-  if (row.components.length > 0) {
-    components.push(row);
-  }
+  components.push(row);
   
   await interaction.update({ embeds: [embed], components });
 }
@@ -482,10 +429,17 @@ async function handleWishlistRemove(message, cardNames) {
     
     const name = namesToRemove[0];
     
-    // Find matches in user's wishlist first
-    const wishlistMatches = userWishlist.wl.filter(c => 
-      c.n.toLowerCase().includes(name.toLowerCase())
-    );
+    // Find matches in user's wishlist using improved search
+    const wishlistCards = userWishlist.wl.map(wlCard => {
+      // Find the full card data for better matching
+      const fullCard = allCards.find(c => c.name === wlCard.n && c.element.toLowerCase() === wlCard.e);
+      return fullCard || { name: wlCard.n, element: wlCard.e, series: 'Unknown' };
+    });
+    
+    const matchedCards = findSimilarCards(name, wishlistCards);
+    const wishlistMatches = matchedCards.map(card => {
+      return userWishlist.wl.find(wlCard => wlCard.n === card.name && wlCard.e === card.element.toLowerCase());
+    }).filter(Boolean);
     
     if (wishlistMatches.length === 0) {
       await message.reply('❌ No card found');
@@ -506,26 +460,49 @@ async function handleWishlistRemove(message, cardNames) {
     }
     
     // Multiple matches - show options
+    const displayLimit = 10;
+    const totalMatches = wishlistMatches.length;
+    const displayMatches = wishlistMatches.slice(0, displayLimit);
+    const hasMore = totalMatches > displayLimit;
+    
     const embed = new EmbedBuilder()
       .setColor(0xff6b6b)
       .setTitle('Multiple cards found in your wishlist')
-      .setDescription(`Found ${wishlistMatches.length} cards. Reply with the number to remove:\n\n` +
-        wishlistMatches.map((c, i) => {
+      .setDescription(`Found ${totalMatches} cards (showing 1-${Math.min(displayLimit, totalMatches)}). Reply with the number to remove:\n\n` +
+        displayMatches.map((c, i) => {
           const emoji = ELEMENT_EMOJIS[c.e] || c.e;
-          return `**${i + 1}.** ${c.n} ${emoji}`;
+          return `**${i + 1}.** \`${c.n}\` ${emoji}`;
         }).join('\n'))
-      .setFooter({ text: 'Reply with 1, 2, 3... or "cancel"' });
+      .setFooter({ text: `Page 1/${Math.ceil(totalMatches / displayLimit)} • Reply with 1-${displayMatches.length} or "cancel"` });
     
-    await message.reply({ embeds: [embed] });
+    const components = [];
+    if (hasMore) {
+      const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`wishlist_next_${message.author.id}`)
+            .setLabel('Next →')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(false)
+        );
+      components.push(row);
+    }
+    
+    await message.reply({ embeds: [embed], components });
     
     pendingConfirmations.set(message.author.id, {
       matches: wishlistMatches,
+      displayMatches: displayMatches,
       wishlist: userWishlist,
       action: 'remove',
+      page: 0,
+      totalPages: Math.ceil(totalMatches / displayLimit),
+      displayLimit: displayLimit,
       timestamp: Date.now()
     });
     
-    setTimeout(() => pendingConfirmations.delete(message.author.id), 60000);
+    setTimeout(() => pendingConfirmations.delete(message.author.id), 120000);
     
   } catch (error) {
     console.error('Wishlist remove error:', error);
