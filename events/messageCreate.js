@@ -98,6 +98,12 @@ module.exports = {
                 return;
             }
             
+            if (content.match(/^rstats$/i)) {
+                const { handleRstatsCommand } = require('../commands/rstats');
+                await handleRstatsCommand(message);
+                return;
+            }
+            
             if (content.match(/^(?:cache|rcache)(?:\s|$)/i)) {
                 const { handleCacheCommand } = require('../utils/cacheManager');
                 await handleCacheCommand(message);
@@ -229,6 +235,12 @@ module.exports = {
             if (command === 'minfo') {
                 const { handleMinfoCommand } = require('../commands/minfo');
                 await handleMinfoCommand(message);
+                return;
+            }
+            
+            if (command === 'rstats') {
+                const { handleRstatsCommand } = require('../commands/rstats');
+                await handleRstatsCommand(message);
                 return;
             }
             
