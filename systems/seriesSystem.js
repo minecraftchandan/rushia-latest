@@ -105,7 +105,7 @@ async function processSeriesMessage(message) {
 
     if (replyText) {
       try {
-        await message.reply(replyText.trim());
+        await message.reply(replyText.trim() + '\n-# Can be inaccurate, please use /suggestion');
       } catch (err) {
         await sendError(`[seriesSystem] Failed to reply in channel ${message.channel.id}: ${err.message}`, {
           guildId: message.guildId,
