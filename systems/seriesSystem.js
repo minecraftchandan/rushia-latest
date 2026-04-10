@@ -77,15 +77,22 @@ async function processSeriesMessage(message) {
     for (let i = 0; i < seriesLines.length; i++) {
       const line = seriesLines[i];
       let seriesName;
+      let originalNumber = i + 1; // Default numbering
       
       if (hasTimerDesc) {
         // For timer format: **1] The Empty Box and Zeroth Maria**
+        const numberMatch = line.match(/^\*\*(\d+)\]/);
+        if (numberMatch) originalNumber = numberMatch[1];
+        
         seriesName = line.trim()
           .replace(/^\*\*\d+\]\s*/, '')  // Remove **1] 
           .replace(/\*\*$/, '')  // Remove trailing **
           .trim();
       } else {
         // For choose format: `1` • Series Name
+        const numberMatch = line.match(/`(\d+)`/);
+        if (numberMatch) originalNumber = numberMatch[1];
+        
         seriesName = line.trim()
           .replace(/^\*\*/, '')  // Remove leading **
           .replace(/\*\*$/, '')  // Remove trailing **
@@ -98,9 +105,9 @@ async function processSeriesMessage(message) {
       
       // Synchronous match using cache
       const match = matchSeriesInList(seriesName, allSeries);
-      const hearts = match ? match.hearts : '00';
+      const hearts = match ? match.hearts : '??';
       
-      replyText += `\`${i}\`] • :heart: \`${hearts.padStart(3, ' ')}\` • ${seriesName}\n`;
+      replyText += `\`${originalNumber}\`] • :heart: \`${hearts.padStart(3, ' ')}\` • ${seriesName}\n`;
     }
 
     if (replyText) {
