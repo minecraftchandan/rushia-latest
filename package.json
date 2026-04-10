@@ -12,6 +12,7 @@
     "deploy": "node deploy-commands.js",
     "refresh": "node scripts/refresh-commands.js",
     "invite": "node scripts/generate-invite.js",
+    "inspect": "node scripts/message-inspector.js",
     "seed": "node scripts/seedDatabase.js"
   },
   "dependencies": {

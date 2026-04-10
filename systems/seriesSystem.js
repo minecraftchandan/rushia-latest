@@ -44,29 +44,19 @@ async function processSeriesMessage(message) {
 
     const embed = message.embeds[0];
     
-    const hasTimerDesc = embed.description?.includes('When the timer runs out, 2 random cards of the most voted for series will be generated!');
+    // Check for SOFI series selection format
     const hasChooseDesc = embed.description?.includes('Choose a series to drop characters from:');
     
-    if (!hasTimerDesc && !hasChooseDesc) return;
+    if (!hasChooseDesc) return;
     if (!embed.description) return;
 
     const lines = embed.description.split('\n');
     
-    let seriesLines;
-    
-    if (hasTimerDesc) {
-      // For timer format: **1] The Empty Box and Zeroth Maria**
-      seriesLines = lines.filter(line => {
-        const trimmed = line.trim();
-        return /^\*\*\d+\]/.test(trimmed);
-      });
-    } else {
-      // For choose format: `1` • Series Name
-      seriesLines = lines.filter(line => {
-        const trimmed = line.trim();
-        return /^(\*\*)?`?\d+`?[\]\s]*[•\]]/.test(trimmed) || /^\*\*\d+\]/.test(trimmed) || /^\d+\s*[•\]]/.test(trimmed);
-      });
-    }
+    // For SOFI format: `1` • Series Name
+    const seriesLines = lines.filter(line => {
+      const trimmed = line.trim();
+      return /^`\d+`\s*•/.test(trimmed);
+    });
 
     if (seriesLines.length === 0) return;
 
@@ -76,36 +66,17 @@ async function processSeriesMessage(message) {
     let replyText = '';
     for (let i = 0; i < seriesLines.length; i++) {
       const line = seriesLines[i];
-      let seriesName;
-      let originalNumber = i + 1; // Default numbering
       
-      if (hasTimerDesc) {
-        // For timer format: **1] The Empty Box and Zeroth Maria**
-        const numberMatch = line.match(/^\*\*(\d+)\]/);
-        if (numberMatch) originalNumber = numberMatch[1];
-        
-        seriesName = line.trim()
-          .replace(/^\*\*\d+\]\s*/, '')  // Remove **1] 
-          .replace(/\*\*$/, '')  // Remove trailing **
-          .trim();
-      } else {
-        // For choose format: `1` • Series Name
-        const numberMatch = line.match(/`(\d+)`/);
-        if (numberMatch) originalNumber = numberMatch[1];
-        
-        seriesName = line.trim()
-          .replace(/^\*\*/, '')  // Remove leading **
-          .replace(/\*\*$/, '')  // Remove trailing **
-          .replace(/^`\d+`\s*•\s*/, '')  // Remove `1` • 
-          .replace(/^`\d+`\s*\]\s*/, '')  // Remove `1`] 
-          .replace(/^\d+\s*•\s*/, '')  // Remove 1 • 
-          .replace(/^\d+\]\s*/, '')  // Remove 1] 
-          .trim();
-      }
+      // Extract number and series name from format: `1` • Series Name
+      const match = line.match(/^`(\d+)`\s*•\s*(.+)$/);
+      if (!match) continue;
       
-      // Synchronous match using cache
-      const match = matchSeriesInList(seriesName, allSeries);
-      const hearts = match ? match.hearts : '??';
+      const originalNumber = match[1];
+      const seriesName = match[2].trim();
+      
+      // Match series in database
+      const seriesMatch = matchSeriesInList(seriesName, allSeries);
+      const hearts = seriesMatch ? seriesMatch.hearts : '??';
       
       replyText += `\`${originalNumber}\`] • :heart: \`${hearts.padStart(3, ' ')}\` • ${seriesName}\n`;
     }
