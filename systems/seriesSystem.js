@@ -103,7 +103,7 @@ async function processSeriesMessage(message) {
     if (replyText) {
       console.log(`[SERIES] Sending reply with ${seriesLines.length} series`);
       try {
-        await message.reply(replyText.trim() + '\n-# Can be inaccurate, please use /suggestion');
+        await message.reply(replyText.trim() + '\n-# Can be inaccurate, report using </suggestion:1446456675954593864>');
         console.log('[SERIES] Reply sent successfully');
       } catch (err) {
         console.error(`[SERIES] Failed to send reply: ${err.message}`);
