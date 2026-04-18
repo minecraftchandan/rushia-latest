@@ -114,7 +114,7 @@ module.exports = {
             // Setpog command: @bot setpog #channel or @bot setpog channelId
             const setpogMatch = content.match(/^setpog(?:\s+(.+))?$/i);
             if (setpogMatch) {
-                const { handleSetpogCommand } = require('../commands/setpog');
+                const { handleSetpogCommand } = require('../commands/set-pog');
                 const args = setpogMatch[1] ? setpogMatch[1].trim().split(/\s+/) : [];
                 await handleSetpogCommand(message, args);
                 return;
@@ -256,7 +256,7 @@ module.exports = {
             }
             
             if (command === 'setpog') {
-                const { handleSetpogCommand } = require('../commands/setpog');
+                const { handleSetpogCommand } = require('../commands/set-pog');
                 await handleSetpogCommand(message, args.slice(1));
                 return;
             }
@@ -315,6 +315,7 @@ module.exports = {
 
         // Route bot messages to the appropriate system
         if (message.author.id === SOFI_BOT_ID) {
+            await processPogMessage(message);
             await processSeriesMessage(message);
             return;
         }
@@ -323,8 +324,6 @@ module.exports = {
 
         const { getSettings } = require('../utils/settingsManager');
         const settings = await getSettings(message.guildId);
-
-        await processPogMessage(message);
 
         if (!settings?.luviEnabled) return;
 
