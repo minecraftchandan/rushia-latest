@@ -47,19 +47,42 @@ function extractIdsFromComponents(components) {
   return ids;
 }
 
+function isTeamContainer(components) {
+  if (!components || !components.length) return false;
+  const container = components.find(c => c.type === 17 && c.components);
+  if (!container) return false;
+
+  const hasTeamHeader = container.components.some(
+    c => c.type === 10 && c.content && /\*\*Team:/i.test(c.content)
+  );
+  const teamButtons = ['Set Active', 'Add Card', 'Remove Card', 'Delete Team'];
+  const hasTeamButtons = container.components.some(
+    c => c.type === 1 && c.components &&
+      c.components.some(btn => teamButtons.includes(btn.label))
+  );
+
+  return hasTeamHeader && hasTeamButtons;
+}
+
 function hasExtractableIds(message) {
   if (message.embeds.length) {
     const ids = extractIdsFromEmbed(message.embeds[0]);
     if (ids.length) return true;
   }
   if (message.components.length) {
+    if (isTeamContainer(message.components)) return true;
     const ids = extractIdsFromComponents(message.components);
     if (ids.length) return true;
   }
   return false;
 }
 
+const processingIds = new Set();
+
 async function addIdReaction(message) {
+  if (!message.components || !message.embeds) return;
+  if (processingIds.has(message.id)) return;
+  if (message.reactions?.cache?.has('🆔')) return;
   if (!hasExtractableIds(message)) return;
   try {
     await message.react('🆔');
@@ -68,30 +91,24 @@ async function addIdReaction(message) {
 
 async function handleIDExtractorReaction(reaction, user) {
   const message = reaction.message;
+  if (processingIds.has(message.id)) return;
+  processingIds.add(message.id);
 
   try {
-    await reaction.users.remove(user);
-    await reaction.users.remove(reaction.client.user);
-  } catch (error) {
-    sendError('Failed to remove reactions:', error);
-  }
+    let ids = [];
+    if (message.embeds.length) ids = extractIdsFromEmbed(message.embeds[0]);
+    if (!ids.length && message.components.length) ids = extractIdsFromComponents(message.components);
 
-  let ids = [];
+    if (ids.length) await message.channel.send(ids.join(','));
 
-  if (message.embeds.length) {
-    ids = extractIdsFromEmbed(message.embeds[0]);
-  }
-
-  if (!ids.length && message.components.length) {
-    ids = extractIdsFromComponents(message.components);
-  }
-
-  if (!ids.length) return;
-
-  try {
-    await message.channel.send(ids.join(','));
-  } catch (error) {
-    sendError('Failed to send ID list:', error);
+    try {
+      await reaction.users.remove(user);
+      await reaction.users.remove(reaction.client.user);
+    } catch (error) {
+      sendError('Failed to remove reactions:', error);
+    }
+  } finally {
+    setTimeout(() => processingIds.delete(message.id), 3000);
   }
 }
 
