@@ -78,8 +78,8 @@ client.on(Events.GuildCreate, async (guild) => {
       return;
     }
 
-    const guideMessage = `
-**Hello! Thanks for adding Rushia!**`;
+    const guideMessage = `**Hello! Thanks for adding Rushia!**
+-# use `rconfig` to enable luvi helper`;
 
     await defaultChannel.send(guideMessage);
     await sendLog(`Sent setup guide message in guild ${guild.name}`, { guildId: guild.id });
