@@ -66,6 +66,12 @@ module.exports = {
                 if (await handleNameSelect(interaction)) return;
                 if (await handleSelectField(interaction)) return;
                 if (await handleSelectFieldValue(interaction)) return;
+
+                if (interaction.customId.startsWith('reset_type_select_')) {
+                    const { handleResetTypeSelect } = require('../systems/leaderboard.system');
+                    await handleResetTypeSelect(interaction);
+                    return;
+                }
                 
                 // Test simulator select menu handler
                 if (interaction.customId === 'test_select') {
@@ -158,9 +164,13 @@ module.exports = {
                     return;
                 }
                 
-                const { handleRarityButton, handleBackButton, handleResetButton, handleConfirmReset, handleCancelReset, handleRlbPagination } = require('../systems/leaderboard.system');
+                const { handleRarityButton, handleClashButton, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset, handleRlbPagination } = require('../systems/leaderboard.system');
                 if (interaction.customId.startsWith('rlb_')) {
                     await handleRlbPagination(interaction);
+                    return;
+                }
+                if (interaction.customId.startsWith('view_clash_lb_')) {
+                    await handleClashButton(interaction);
                     return;
                 }
                 if (interaction.customId.startsWith('view_rarity_drops_')) {

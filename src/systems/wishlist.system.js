@@ -26,7 +26,7 @@ const ELEMENT_EMOJIS = {
 
 function getCards() {
   if (!cardsCache) {
-    const cardsPath = path.join(__dirname, '..', 'cards.json');
+    const cardsPath = path.join(__dirname, '..', '..', 'data', 'cards.json');
     cardsCache = JSON.parse(fs.readFileSync(cardsPath, 'utf8'));
   }
   return cardsCache;

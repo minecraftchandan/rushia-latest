@@ -8,9 +8,7 @@ async function checkReminders(client) {
     const dueReminders = await Reminder.getDueReminders(2000, SCHEDULER.BATCH_SIZE);
     if (dueReminders.length === 0) return;
 
-    // Mark as sent immediately to prevent race conditions from multiple scheduler runs
-    const reminderIds = dueReminders.map(r => r._id);
-    await Reminder.markAsSent(reminderIds);
+    // Reminders are already atomically claimed inside getDueReminders
 
     const remindersToProcess = dueReminders.reduce((acc, reminder) => {
       const key = `${reminder.userId}-${reminder.type}`;

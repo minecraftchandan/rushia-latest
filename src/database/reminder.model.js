@@ -78,10 +78,13 @@ reminderSchema.statics.markAsSent = async function(reminderIds) {
   );
 };
 
-// Static method for getting due reminders (optimized query)
+// Static method for getting due reminders (atomic claim - prevents double processing)
 reminderSchema.statics.getDueReminders = async function(windowMs = 2000, limit = 100) {
   const now = new Date();
-  return await this.find({
+  const results = [];
+  
+  // Atomically claim each reminder by setting sent=true in the same operation
+  const candidates = await this.find({
     remindAt: {
       $gte: new Date(now.getTime() - windowMs),
       $lte: new Date(now.getTime() + windowMs)
@@ -91,6 +94,18 @@ reminderSchema.statics.getDueReminders = async function(windowMs = 2000, limit =
   .limit(limit)
   .lean()
   .exec();
+
+  for (const reminder of candidates) {
+    // Atomic claim: only succeeds if sent is still false
+    const claimed = await this.findOneAndUpdate(
+      { _id: reminder._id, sent: false },
+      { $set: { sent: true, sentAt: new Date() } },
+      { new: false }
+    );
+    if (claimed) results.push(reminder);
+  }
+
+  return results;
 };
 
 module.exports = mongoose.model('Reminder', reminderSchema);

@@ -31,13 +31,17 @@ class DatabaseManager {
       const UserNotificationSettings = require('./user-notification-settings.model');
       const Drops = require('./drops.model');
       const RarityDrop = require('./rarity-drop.model');
+      const ClashCount = require('./clash-count.model');
+      const UsernameCache = require('./username-cache.model');
 
       await Promise.all([
         Reminder.createIndexes(),
         BotSettings.createIndexes(),
         UserNotificationSettings.createIndexes(),
         Drops.createIndexes(),
-        RarityDrop.createIndexes()
+        RarityDrop.createIndexes(),
+        ClashCount.createIndexes(),
+        UsernameCache.createIndexes()
       ]);
       
       // Initialize POG models separately (they use their own connection)

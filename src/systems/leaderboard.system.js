@@ -1,7 +1,8 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const Drops = require('../database/drops.model');
 const RarityDrop = require('../database/rarity-drop.model');
+const ClashCount = require('../database/clash-count.model');
 
 async function handleRlbCommand(message) {
   const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
@@ -69,7 +70,12 @@ async function handleRlbCommand(message) {
       .setEmoji('🔄')
       .setDisabled(!isOwner && !isAdmin);
 
-    const components = [rarityButton, resetButton];
+    const clashButton = new ButtonBuilder()
+      .setCustomId(`view_clash_lb_${message.author.id}`)
+      .setLabel('Clash')
+      .setStyle(ButtonStyle.Success);
+
+    const components = [rarityButton, clashButton, resetButton];
 
     // Add pagination for admin/owner if more than 10 entries
     if (canPaginate && allDroppers.length > perPage) {
@@ -294,29 +300,25 @@ async function handleResetButton(interaction) {
     }
 
     const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-    
-    // Only bot owner or admin can reset
     if (interaction.user.id !== BOT_OWNER_ID && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({ content: '❌ Only the bot owner or server administrators can reset the leaderboard.', ephemeral: true });
     }
 
-    // Show confirmation buttons
-    const yesButton = new ButtonBuilder()
-      .setCustomId(`confirm_reset_${interaction.guild.id}`)
-      .setLabel('Yes')
-      .setStyle(ButtonStyle.Danger);
+    const select = new StringSelectMenuBuilder()
+      .setCustomId(`reset_type_select_${interaction.user.id}`)
+      .setPlaceholder('Choose what to reset...')
+      .addOptions(
+        { label: 'Drop', description: 'Reset all drop counts', value: 'drop' },
+        { label: 'Rarity Drop', description: 'Reset all exotic/legendary counts', value: 'rarity' },
+        { label: 'Clash', description: 'Reset all clash counts', value: 'clash' }
+      );
 
-    const noButton = new ButtonBuilder()
-      .setCustomId('cancel_reset')
-      .setLabel('No')
-      .setStyle(ButtonStyle.Secondary);
+    const row = new ActionRowBuilder().addComponents(select);
 
-    const row = new ActionRowBuilder().addComponents(yesButton, noButton);
-
-    await interaction.reply({ 
-      content: '⚠️ Are you sure you want to reset all drop data for this server? This action cannot be undone.', 
+    await interaction.reply({
+      content: '🔄 **Select what to reset:**',
       components: [row],
-      ephemeral: true 
+      ephemeral: true
     });
 
   } catch (error) {
@@ -324,18 +326,60 @@ async function handleResetButton(interaction) {
   }
 }
 
+async function handleResetTypeSelect(interaction) {
+  try {
+    const parts = interaction.customId.split('_');
+    const allowedUserId = parts[3];
+    if (interaction.user.id !== allowedUserId) {
+      return interaction.reply({ content: 'Dont click 😭', ephemeral: true });
+    }
+
+    const type = interaction.values[0];
+    const labels = { drop: 'Drop', rarity: 'Rarity Drop', clash: 'Clash' };
+
+    const yesButton = new ButtonBuilder()
+      .setCustomId(`confirm_reset_${interaction.guild.id}_${type}`)
+      .setLabel('Yes, Reset')
+      .setStyle(ButtonStyle.Danger);
+
+    const noButton = new ButtonBuilder()
+      .setCustomId('cancel_reset')
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder().addComponents(yesButton, noButton);
+
+    await interaction.update({
+      content: `⚠️ Are you sure you want to reset **${labels[type]}** data for this server? This cannot be undone.`,
+      components: [row]
+    });
+
+  } catch (error) {
+    await interaction.update({ content: '❌ An error occurred.', components: [] });
+  }
+}
+
 async function handleConfirmReset(interaction) {
   try {
-    const guildId = interaction.customId.split('_')[2];
-    
-    // Delete all drops for this server
-    await Drops.deleteMany({ guildId });
-    await RarityDrop.deleteMany({ guildId });
+    const parts = interaction.customId.split('_');
+    const guildId = parts[2];
+    const type = parts[3];
 
-    await interaction.update({ 
-      content: '✅ Leaderboard has been reset to 0 for this server.', 
-      components: []
-    });
+    const typeMap = {
+      drop: { model: Drops, label: 'Drop' },
+      rarity: { model: RarityDrop, label: 'Rarity Drop' },
+      clash: { model: ClashCount, label: 'Clash' }
+    };
+
+    if (type && typeMap[type]) {
+      await typeMap[type].model.deleteMany({ guildId });
+      await interaction.update({ content: `✅ **${typeMap[type].label}** leaderboard has been reset for this server.`, components: [] });
+    } else {
+      await Drops.deleteMany({ guildId });
+      await RarityDrop.deleteMany({ guildId });
+      await ClashCount.deleteMany({ guildId });
+      await interaction.update({ content: '✅ All leaderboards have been reset for this server.', components: [] });
+    }
 
   } catch (error) {
     await interaction.update({ content: '❌ An error occurred while resetting.', components: [] });
@@ -346,7 +390,46 @@ async function handleCancelReset(interaction) {
   await interaction.update({ content: '❌ Reset cancelled.', components: [] });
 }
 
-module.exports = { handleRlbCommand, handleRarityButton, handleBackButton, handleResetButton, handleConfirmReset, handleCancelReset };
+async function handleClashButton(interaction) {
+  try {
+    const allowedUserId = interaction.customId.split('_')[3];
+    if (interaction.user.id !== allowedUserId) {
+      return interaction.reply({ content: 'Dont click 😭', ephemeral: true });
+    }
+    const guildId = interaction.guild.id;
+    const topClash = await ClashCount.find({ guildId }).sort({ clash_count: -1 }).limit(10);
+    const allClash = await ClashCount.find({ guildId });
+    const totalClashes = allClash.reduce((sum, u) => sum + u.clash_count, 0);
+    const embed = new EmbedBuilder()
+      .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) })
+      .setTitle('⚔️ Clash Leaderboard')
+      .setColor(0xe67e22);
+    if (!topClash.length) {
+      embed.setDescription('📊 No clashes tracked yet in this server.');
+    } else {
+      const maxWidth = Math.max(...topClash.map(u => u.clash_count.toString().length), 5);
+      let rankings = '`S.No` • `Clashes` • `User`\n';
+      for (let i = 0; i < topClash.length; i++) {
+        const u = topClash[i];
+        const rank = (i + 1) + ']';
+        rankings += '`' + rank.padEnd(4, ' ') + '` • `' + u.clash_count.toString().padStart(maxWidth, ' ') + '` • <@' + u.userId + '>\n';
+      }
+      embed.addFields({ name: '\u200b', value: rankings });
+      embed.setFooter({ text: 'Participants: ' + allClash.length + ' | Total Clashes: ' + totalClashes });
+    }
+    const back = new ButtonBuilder()
+      .setCustomId('back_to_drops_' + interaction.user.id + '_0')
+      .setLabel('Back')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('⬅️');
+    await interaction.update({ embeds: [embed], components: [new ActionRowBuilder().addComponents(back)] });
+  } catch (error) {
+    sendError('Clash lb error:', error);
+    await interaction.update({ content: '❌ An error occurred.', embeds: [], components: [] });
+  }
+}
+
+module.exports = { handleRlbCommand, handleRarityButton, handleClashButton, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset };
 
 
 async function handleRlbPagination(interaction) {

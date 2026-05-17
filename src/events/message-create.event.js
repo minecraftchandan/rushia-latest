@@ -3,11 +3,12 @@ const { processBossMessage } = require('../systems/tier-ping.system');
 const { processStaminaMessage } = require('../systems/stamina-reminder.system');
 const { processExpeditionMessage } = require('../systems/expedition-reminder.system');
 const { processRaidMessage } = require('../systems/raid-reminder.system');
-const { processRaidSpawnMessage } = require('../systems/raid-spawn-reminder.system');
+const { processRaidSpawnMessage, processUserSpawnCommand } = require('../systems/raid-spawn-reminder.system');
 const { processRaidWishlist } = require('../systems/raid-wishlist.system');
 const { processDropMessage } = require('../systems/drop-reminder.system');
 const { processRarityDrop } = require('../systems/rarity-drop.system');
 const { processDropCount } = require('../systems/drop-count.system');
+const { processClashMessage } = require('../systems/clash-count.system');
 const { processInventoryMessage: processGeneratorMessage } = require('../systems/message-generator.system');
 const { processPogMessage } = require('../systems/pog.system');
 const { processSeriesMessage } = require('../systems/series.system');
@@ -19,9 +20,10 @@ module.exports = {
     async execute(message) {
         const client = message.client;
 
+        if (!message.author.bot) await processUserSpawnCommand(message);
+
         // Handle bot mentions for card search and logs
-        if (!message.author.bot && message.mentions.has(client.user)) {
-            const content = message.content.replace(`<@${client.user.id}>`, '').trim();
+        if (!message.author.bot && message.mentions.has(client.user)) {            const content = message.content.replace(`<@${client.user.id}>`, '').trim();
             
             // Wishlist add command: @Bot wa name or @Bot wa name1,name2,name3
             const waMatch = content.match(/^wa\s+(.+)$/i);
@@ -336,6 +338,7 @@ module.exports = {
         await processDropMessage(message);
         await processRarityDrop(message);
         await processDropCount(message);
+        await processClashMessage(message);
         await processBossMessage(message);
         await processGeneratorMessage(message);
         await addIdReaction(message);

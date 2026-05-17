@@ -66,38 +66,33 @@ function parseRaidInfo(description) {
   return { raidName: raidNames[0] || null, raidNames, raids, tier, element: elementMatches[0] || null };
 }
 
-async function checkWishlistAndPing(message, raidName, element) {
+async function checkWishlistAndPing(message, raidNames, elements) {
   try {
-    const cacheKey = `${message.channel.id}-${raidName}-${element}`;
+    const cacheKey = `${message.channel.id}-${raidNames.join('&')}`;
     if (wishlistPingCache.has(cacheKey)) return;
-    
     wishlistPingCache.set(cacheKey, true);
     setTimeout(() => wishlistPingCache.delete(cacheKey), 10000);
 
     const Wishlist = await getWishlistConnection();
     const usersWithWishlist = await Wishlist.find({
-      'wl': { $elemMatch: { n: raidName, e: element } }
-    }, { _id: 1 }).lean();
+      'wl.n': { $in: raidNames }
+    }, { _id: 1, wl: 1 }).lean();
 
-    if (usersWithWishlist.length > 0) {
-      const mentions = usersWithWishlist.map(w => `<@${w._id}>`).join(' ');
-      const emoji = ELEMENT_EMOJIS[element] || element;
-      
-      // Send channel mention (existing functionality)
-      message.channel.send(`${mentions} Your wishlisted raid **${raidName}** ${emoji} has spawned!`).catch(() => {});
-      
-      // Send individual DMs to each user
-      const spawnerUserId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
-      const spawnerMention = spawnerUserId ? `<@${spawnerUserId}>` : 'someone';
-      
-      for (const user of usersWithWishlist) {
-        try {
-          const discordUser = await message.client.users.fetch(user._id);
-          await discordUser.send(`Your wishlist raid **${raidName}** ${emoji} has spawned by ${spawnerMention}!`);
-        } catch (dmError) {
-          // Silently fail if DM can't be sent (user has DMs disabled, etc.)
-        }
-      }
+    if (!usersWithWishlist.length) return;
+
+    const spawnerUserId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
+    const spawnerMention = spawnerUserId ? `<@${spawnerUserId}>` : 'someone';
+    const elementEmoji = elements.map(e => ELEMENT_EMOJIS[e] || e).join('');
+    const displayName = raidNames.join(' & ');
+
+    const mentions = usersWithWishlist.map(w => `<@${w._id}>`).join(' ');
+    message.channel.send(`${mentions} Your wishlisted raid **${displayName}** ${elementEmoji} has spawned!`).catch(() => {});
+
+    for (const user of usersWithWishlist) {
+      try {
+        const discordUser = await message.client.users.fetch(user._id);
+        await discordUser.send(`Your wishlist raid **${displayName}** ${elementEmoji} has spawned by ${spawnerMention}!`);
+      } catch {}
     }
   } catch (error) {
     sendError('Wishlist error:', error.message);
@@ -111,12 +106,14 @@ async function detectAndSetRaidSpawnReminder(message) {
   if (!message.embeds.length) return;
 
   const embed = message.embeds[0];
-  if (embed.title !== 'Raid Spawned!') return;
+  if (!embed.title?.includes('Raid Spawned')) return;
 
   const { raidName, raidNames, raids, tier, element } = parseRaidInfo(embed.description || '');
 
   if (raids.length) {
-    await Promise.all(raids.filter(r => r.element).map(r => checkWishlistAndPing(message, r.name, r.element)));
+    const raidNames = raids.filter(r => r.name).map(r => r.name);
+    const elements = raids.filter(r => r.element).map(r => r.element);
+    if (raidNames.length) await checkWishlistAndPing(message, raidNames, elements);
   }
 
   const userId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
