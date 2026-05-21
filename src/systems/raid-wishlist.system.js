@@ -1,8 +1,6 @@
-const Reminder = require('../database/reminder.model');
 const mongoose = require('mongoose');
 const { getUserSettings } = require('../utils/user-settings.manager');
 const { sendLog, sendError } = require('../utils/logger');
-const { checkExistingReminder, createReminderSafe } = require('../utils/reminder-duplicate.checker');
 
 const LUVI_ID = '1269481871021047891';
 const timeoutMap = new Map();
@@ -88,8 +86,13 @@ async function checkWishlistAndPing(message, raidNames, elements) {
     raidNames.forEach((name, i) => { nameElementMap[name] = elements[i] || elements[0]; });
 
     for (const user of usersWithWishlist) {
-      // Only show the names this user actually has in their wl
-      const matchedNames = raidNames.filter(n => user.wl.some(w => w.n === n));
+      // Only match names where element also matches the user's wishlist entry
+      const matchedNames = raidNames.filter(n => {
+        const spawnedElement = nameElementMap[n];
+        return user.wl.some(w => w.n === n && (!spawnedElement || w.e === spawnedElement));
+      });
+      if (!matchedNames.length) continue;
+
       const displayName = matchedNames.join(' & ');
       const elementEmoji = matchedNames.map(n => ELEMENT_EMOJIS[nameElementMap[n]] || '').join('');
       const mention = `<@${user._id}>`;
@@ -106,60 +109,20 @@ async function checkWishlistAndPing(message, raidNames, elements) {
   }
 }
 
-async function detectAndSetRaidSpawnReminder(message) {
+async function processRaidWishlist(message) {
   if (!message.guild || message.author.id !== LUVI_ID) return;
-  
   if (Date.now() - message.createdTimestamp > 60000) return;
   if (!message.embeds.length) return;
 
   const embed = message.embeds[0];
   if (!embed.title?.includes('Raid Spawned')) return;
 
-  const { raidName, raidNames, raids, tier, element } = parseRaidInfo(embed.description || '');
+  const { raids } = parseRaidInfo(embed.description || '');
 
-  if (raids.length) {
-    const raidNames = raids.filter(r => r.name).map(r => r.name);
-    const elements = raids.filter(r => r.element).map(r => r.element);
-    if (raidNames.length) await checkWishlistAndPing(message, raidNames, elements);
-  }
-
-  const userId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
-  if (!userId) return;
-
-  const thirtyMinutes = 30 * 60 * 1000;
-  const remindAt = new Date(Date.now() + thirtyMinutes);
-
-  const existingReminder = await checkExistingReminder(userId, 'raidSpawn');
-  if (existingReminder) return;
-
-  const result = await createReminderSafe({
-    userId,
-    guildId: message.guild.id,
-    channelId: message.channel.id,
-    remindAt,
-    type: 'raidSpawn',
-    reminderMessage: `<@${userId}>, You can now use </raid spawn:1472170030723764364> to spawn a new raid boss!`
-  });
-
-  if (result.success) {
-    await sendLog('REMINDER_CREATED', { 
-      category: 'REMINDER',
-      action: 'CREATED',
-      type: 'raidSpawn',
-      userId, 
-      guildId: message.guild.id,
-      channelId: message.channel.id,
-      remindAt: remindAt.toISOString()
-    });
-  } else if (result.reason !== 'duplicate') {
-    await sendError('REMINDER_CREATE_FAILED', { 
-      category: 'REMINDER',
-      action: 'CREATE_FAILED',
-      type: 'raidSpawn',
-      userId,
-      error: result.error.message
-    });
-  }
+  if (!raids.length) return;
+  const raidNames = raids.filter(r => r.name).map(r => r.name);
+  const elements = raids.filter(r => r.element).map(r => r.element);
+  if (raidNames.length) await checkWishlistAndPing(message, raidNames, elements);
 }
 
-module.exports = { processRaidSpawnMessage: detectAndSetRaidSpawnReminder, processRaidWishlist: detectAndSetRaidSpawnReminder };
+module.exports = { processRaidWishlist };
