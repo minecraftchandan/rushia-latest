@@ -1,4 +1,5 @@
 const { sendLog, sendError } = require('../utils/logger');
+
 function parseBossComponent(components) {
   if (!components || components.length === 0) return null;
 
@@ -8,13 +9,11 @@ function parseBossComponent(components) {
   let bossName = null;
   let tier = null;
 
-  // Find boss name from first text component (id: 2)
   const nameComponent = container.components.find(c => c.type === 10 && c.id === 2);
   if (nameComponent && nameComponent.content) {
     bossName = nameComponent.content.replace(/\*\*/g, '').trim();
   }
 
-  // Find tier from second text component (id: 3) containing tier info
   const tierComponent = container.components.find(c => c.type === 10 && c.content && c.content.includes('__**Tier**__'));
   if (tierComponent) {
     const tierMatch = tierComponent.content.match(/<:LU_Tier(\d+):\d+>/);
@@ -29,15 +28,12 @@ function parseBossComponent(components) {
 function parseBossEmbed(embed) {
   if (!embed || !embed.title) return null;
 
-  // Only consider embeds with the monster emoji (boss)
   const monsterEmojiMatch = embed.title.match(/<:LU_Monster:\d+>/);
   if (!monsterEmojiMatch) return null;
 
-  // Extract boss name after emoji
   const bossNameMatch = embed.title.match(/<:LU_Monster:\d+>\s*(.+)/);
   const bossName = bossNameMatch ? bossNameMatch[1].trim() : null;
 
-  // Extract Tier from any embed field containing <:LU_TierX:...>
   let tier = null;
   if (embed.fields && embed.fields.length > 0) {
     for (const field of embed.fields) {
@@ -86,28 +82,19 @@ function parseExpeditionComponent(components) {
   if (!components || components.length === 0) return null;
 
   const container = components.find(c => c.type === 17);
-  if (!container || !container.components) {
-    return null;
-  }
+  if (!container || !container.components) return null;
 
-  // Check for "username's Expeditions" format
-  const titleComponent = container.components.find(c => 
+  const titleComponent = container.components.find(c =>
     c.type === 10 && c.content && c.content.includes("'s Expeditions")
   );
 
-  if (!titleComponent) {
-    return null;
-  }
+  if (!titleComponent) return null;
 
   const usernameMatch = titleComponent.content.match(/^(.+)'s Expeditions$/);
-  if (!usernameMatch) {
-    return null;
-  }
+  if (!usernameMatch) return null;
   const username = usernameMatch[1];
 
   const cards = [];
-
-  // Find all media accessory components (type 9) with expedition cards
   const mediaComponents = container.components.filter(c => c.type === 9 && c.components);
 
   for (const mediaComp of mediaComponents) {
@@ -115,8 +102,6 @@ function parseExpeditionComponent(components) {
     if (!textComp || !textComp.content) continue;
 
     const content = textComp.content;
-
-    // Extract card name and ID
     const cardMatch = content.match(/<:LU_[A-Z]:\d+> (.+?)(?:\s*\||\n)/);
     const idMatch = content.match(/ID: (\d+)/);
     const timeMatch = content.match(/⏳ (?:(\d+)h\s*)?(?:(\d+)m)?(?:\s*(\d+)s)? remaining/);
@@ -131,10 +116,9 @@ function parseExpeditionComponent(components) {
       const hours = parseInt(timeMatch[1] || 0, 10);
       const minutes = parseInt(timeMatch[2] || 0, 10);
       const seconds = parseInt(timeMatch[3] || 0, 10);
-      
+
       let remainingMillis = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000) + (seconds * 1000);
-      
-      // If no seconds specified but has hours/minutes, add 59 seconds
+
       if (!timeMatch[3] && (timeMatch[1] || timeMatch[2])) {
         remainingMillis += 59 * 1000;
       }
@@ -214,17 +198,17 @@ function parseRaidViewEmbed(embed) {
 
 function parseRaidSpawnEmbed(embed) {
   if (!embed) return null;
-  
+
   let foundYouSpawned = false;
-  
+
   try {
     if (embed.title?.includes('You spawned')) foundYouSpawned = true;
   } catch (e) {}
-  
+
   try {
     if (embed.description?.includes('You spawned')) foundYouSpawned = true;
   } catch (e) {}
-  
+
   try {
     if (embed.fields) {
       for (const field of embed.fields) {
@@ -235,14 +219,27 @@ function parseRaidSpawnEmbed(embed) {
       }
     }
   } catch (e) {}
-  
+
   if (!foundYouSpawned) return null;
-  
+
   const footer = embed.footer?.text || '';
   const raidIdMatch = footer.match(/Raid ID:\s*(\d+)/);
   if (!raidIdMatch) return null;
-  
+
   return { raidSpawned: true, raidId: raidIdMatch[1] };
+}
+
+function parseRaidAttackEmbed(message) {
+  const userId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
+  if (!userId) return null;
+
+  const embed = message.embeds?.[0];
+  if (!embed) return null;
+
+  const text = `${embed.title || ''} ${embed.description || ''}`;
+  if (!text.includes('Fatigued') && !text.includes('fatigued')) return null;
+
+  return { userId, fatigueMillis: 10 * 60 * 1000 };
 }
 
 function parseRaidViewComponent(components) {
@@ -250,12 +247,10 @@ function parseRaidViewComponent(components) {
 
   const fatiguedUsers = [];
 
-  // Find container component (type 17)
   const container = components.find(c => c.type === 17);
   if (!container || !container.components) return null;
 
-  // Find the text component with Party Members
-  const partyMembersComponent = container.components.find(c => 
+  const partyMembersComponent = container.components.find(c =>
     c.type === 10 && c.content && c.content.includes('__Party Members__')
   );
 
@@ -295,5 +290,6 @@ module.exports = {
   parseExpeditionComponent,
   parseRaidViewEmbed,
   parseRaidViewComponent,
+  parseRaidAttackEmbed,
   parseRaidSpawnEmbed,
 };

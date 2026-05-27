@@ -85,10 +85,7 @@ reminderSchema.statics.getDueReminders = async function(windowMs = 2000, limit =
   
   // Atomically claim each reminder by setting sent=true in the same operation
   const candidates = await this.find({
-    remindAt: {
-      $gte: new Date(now.getTime() - windowMs),
-      $lte: new Date(now.getTime() + windowMs)
-    },
+    remindAt: { $lte: new Date(now.getTime() + windowMs) },
     sent: false
   })
   .limit(limit)
