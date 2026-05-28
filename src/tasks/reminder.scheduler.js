@@ -105,7 +105,16 @@ async function checkReminders(client) {
                 }
               }
             } catch (innerError) {
-              sendError(`[REMINDER] Failed to send ${reminderData.type} reminder:`, innerError.message);
+              await sendError('REMINDER_SEND_FAILED', {
+                category: 'REMINDER',
+                action: 'SEND_FAILED',
+                type: reminderData.type,
+                userId: reminderData.userId,
+                guildId: reminderData.guildId,
+                channelId: reminderData.channelId,
+                method: sendInDm ? 'DM' : 'CHANNEL',
+                error: innerError.message
+              });
               sendSuccess = false;
             }
             
