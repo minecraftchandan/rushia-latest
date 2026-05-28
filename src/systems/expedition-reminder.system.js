@@ -83,7 +83,7 @@ async function processExpeditionMessage(message) {
     const existingByTime = await Reminder.findOne({
       userId,
       type: 'expedition',
-      sent: false,
+      status: 'pending',
       remindAt: {
         $gte: new Date(group.remindAt.getTime() - timeWindow),
         $lte: new Date(group.remindAt.getTime() + timeWindow)

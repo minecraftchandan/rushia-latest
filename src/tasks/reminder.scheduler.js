@@ -53,6 +53,10 @@ async function checkReminders(client) {
 
           const sendReminder = userSettings[reminderData.type] !== false;
           let sendInDm = false;
+          // raidSpawnReminder is the settings key for raidSpawn type
+          const effectiveSendReminder = reminderData.type === 'raidSpawn'
+            ? userSettings.raidSpawnReminder !== false
+            : sendReminder;
 
           if (reminderData.type === 'raid') {
             sendInDm = true;
@@ -66,7 +70,7 @@ async function checkReminders(client) {
             sendInDm = userSettings?.dropDM;
           }
 
-          if (sendReminder) {
+          if (effectiveSendReminder) {
             let sendSuccess = false;
             
             try {
@@ -105,17 +109,14 @@ async function checkReminders(client) {
               sendSuccess = false;
             }
             
-            // Delete immediately after successful send to prevent duplicates
             if (sendSuccess) {
-              await Reminder.deleteMany({ _id: { $in: reminderData.reminderIds } });
-              sendLog(`[REMINDER] Deleted ${reminderData.reminderIds.length} reminders after successful send`);
+              await Reminder.markAsSent(reminderData.reminderIds);
+              sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} reminders as sent`);
             } else {
-              // Send failed, revert sent flag for retry on next cycle
               failedReminderIds.push(...reminderData.reminderIds);
               sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} ${reminderData.type} reminders for retry`);
             }
           } else {
-            // User disabled this reminder type, delete it
             await Reminder.deleteMany({ _id: { $in: reminderData.reminderIds } });
             sendLog(`[REMINDER] Deleted ${reminderData.reminderIds.length} disabled ${reminderData.type} reminders`);
           }
@@ -133,12 +134,8 @@ async function checkReminders(client) {
 
     await Promise.all(sendPromises);
 
-    // Revert sent flag for failed reminders so they can be retried
     if (failedReminderIds.length > 0) {
-      await Reminder.updateMany(
-        { _id: { $in: failedReminderIds }, sent: true },
-        { $set: { sent: false, sentAt: null } }
-      );
+      await Reminder.revertClaimed(failedReminderIds);
       sendLog(`[REMINDER] Reverted ${failedReminderIds.length} failed reminders for retry`);
     }
 

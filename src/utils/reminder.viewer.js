@@ -12,13 +12,13 @@ async function handleReminderView(message) {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     await Reminder.deleteMany({
         remindAt: { $lt: oneHourAgo },
-        sent: { $ne: true }
+        status: { $ne: 'sent' }
     });
 
     // Only get active (non-expired) reminders
     const now = new Date();
     const reminders = await Reminder.find({
-        sent: { $ne: true },
+        status: { $ne: 'sent' },
         remindAt: { $gte: now }
     }).sort({ remindAt: 1 });
     
@@ -141,7 +141,7 @@ async function handleReminderInteraction(interaction) {
     }
 
     const reminders = await Reminder.find({
-        sent: { $ne: true },
+        status: { $ne: 'sent' },
         remindAt: { $gte: new Date() }
     }).sort({ remindAt: 1 });
 

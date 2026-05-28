@@ -71,7 +71,7 @@ class DatabaseManager {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       await Reminder.deleteMany({ 
         createdAt: { $lt: sevenDaysAgo },
-        sent: false
+        status: 'pending'
       });
     } catch (error) {
       const { sendError } = require('../utils/logger');
@@ -86,7 +86,7 @@ class DatabaseManager {
       const UserNotificationSettings = require('./user-notification-settings.model');
 
       const [reminderCount, guildCount, userCount] = await Promise.all([
-        Reminder.countDocuments({ sent: false }),
+        Reminder.countDocuments({ status: 'pending' }),
         BotSettings.countDocuments(),
         UserNotificationSettings.countDocuments()
       ]);

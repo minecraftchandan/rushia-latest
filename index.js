@@ -167,6 +167,14 @@ async function deployCommands(client) {
         console.log('✅ Settings cache initialized');
         
         console.log('⏰ Starting reminder scheduler...');
+        const Reminder = require('./src/database/reminder.model');
+        const stuckCount = await Reminder.updateMany(
+          { status: 'claimed', createdAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
+          { $set: { status: 'pending' } }
+        );
+        if (stuckCount.modifiedCount > 0) {
+          await sendLog(`[STARTUP] Recovered ${stuckCount.modifiedCount} stuck claimed reminders`, { category: 'SYSTEM' });
+        }
         startScheduler(readyClient);
         console.log('✅ Reminder scheduler started');
         
