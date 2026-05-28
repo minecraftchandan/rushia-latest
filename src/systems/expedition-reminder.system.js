@@ -1,7 +1,6 @@
 const { parseExpeditionEmbed, parseExpeditionComponent } = require('../utils/embed.parser');
-const Reminder = require('../database/reminder.model');
 const { sendLog, sendError } = require('../utils/logger');
-const { checkExistingReminder, createReminderSafe } = require('../utils/reminder-duplicate.checker');
+const { createReminderSafe } = require('../utils/reminder-duplicate.checker');
 
 async function processExpeditionMessage(message) {
   if (!message.guild) return;
@@ -78,23 +77,6 @@ async function processExpeditionMessage(message) {
     const group = timeGroups[timeKey];
     const cardNames = group.cards.map(c => c.cardName).join(', ');
     
-    // Check if reminder already exists for this user and time (within 1 minute)
-    const timeWindow = 60000; // 1 minute
-    const existingByTime = await Reminder.findOne({
-      userId,
-      type: 'expedition',
-      status: 'pending',
-      remindAt: {
-        $gte: new Date(group.remindAt.getTime() - timeWindow),
-        $lte: new Date(group.remindAt.getTime() + timeWindow)
-      }
-    });
-    
-    if (existingByTime) continue;
-    
-    const existingReminder = await checkExistingReminder(userId, 'expedition', group.cards[0].cardId);
-    if (existingReminder) continue;
-
     const result = await createReminderSafe({
       userId,
       guildId: message.guild.id,

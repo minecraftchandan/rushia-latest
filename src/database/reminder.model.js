@@ -64,8 +64,8 @@ reminderSchema.statics.upsertReminder = async function(reminderData) {
   return await this.findOneAndUpdate(
     filter,
     {
-      $set: updateData,
-      $setOnInsert: { userId, type, cardId, channelId, guildId, status: 'pending', createdAt: new Date() }
+      $set: { ...updateData, channelId, guildId },
+      $setOnInsert: { userId, type, cardId, status: 'pending', createdAt: new Date() }
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );

@@ -25,18 +25,14 @@ async function processStaminaMessage(message) {
     const remindAt = new Date(Date.now() + minutesToRegen * 60 * 1000);
 
     try {
-      await Reminder.findOneAndUpdate(
-        { userId, type: 'stamina' },
-        {
-          userId,
-          guildId: message.guild.id,
-          channelId: message.channel.id,
-          remindAt,
-          type: 'stamina',
-          reminderMessage: `<@${userId}>, your stamina has reached 10/10 \n use </clash:1472170030228570113>`
-        },
-        { upsert: true, new: true }
-      );
+      await Reminder.upsertReminder({
+        userId,
+        guildId: message.guild.id,
+        channelId: message.channel.id,
+        remindAt,
+        type: 'stamina',
+        reminderMessage: `<@${userId}>, your stamina has reached 10/10 \n use </clash:1472170030228570113>`
+      });
 
       await message.channel.send({
         content: `<@${userId}>, I'll remind you when your stamina is 10/10.`,
