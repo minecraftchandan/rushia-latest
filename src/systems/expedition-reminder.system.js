@@ -60,7 +60,7 @@ async function processExpeditionMessage(message) {
   // Group cards by time (within 5 second window)
   const timeGroups = {};
   for (const card of expeditionInfo.cards) {
-    const remindAt = new Date(Date.now() + card.remainingMillis);
+    const remindAt = new Date(message.createdTimestamp + card.remainingMillis);
     const timeKey = Math.floor(remindAt.getTime() / 5000); // 5 second buckets
     
     if (!timeGroups[timeKey]) {

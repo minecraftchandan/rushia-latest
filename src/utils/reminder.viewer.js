@@ -71,8 +71,13 @@ async function sendReminderPage(message, userId, page, filter, allReminders, int
             
             // Get DM status
             const userSettings = await getUserSettings(r.userId);
-            const dmField = `${r.type}DM`;
-            const dmEnabled = userSettings?.[dmField] || false;
+            let dmEnabled;
+            if (r.type === 'raid') {
+              dmEnabled = true; // raid always sends via DM
+            } else {
+              const dmField = `${r.type}DM`;
+              dmEnabled = userSettings?.[dmField] || false;
+            }
             const dmStatus = dmEnabled ? '✅ DM' : '❌ DM';
             
             return `**${typeName}** | <@${r.userId}> - <t:${time}:R> | ${dmStatus}`;
