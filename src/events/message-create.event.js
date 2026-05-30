@@ -1,7 +1,6 @@
 const { Events } = require('discord.js');
 const { processBossMessage } = require('../systems/tier-ping.system');
 const { processStaminaMessage } = require('../systems/stamina-reminder.system');
-const { processExpeditionMessage } = require('../systems/expedition-reminder.system');
 const { processRaidMessage } = require('../systems/raid-reminder.system');
 const { processRaidSpawnMessage, processUserSpawnCommand } = require('../systems/raid-spawn-reminder.system');
 const { processRaidWishlist } = require('../systems/raid-wishlist.system');
@@ -332,7 +331,6 @@ module.exports = {
         if (!settings?.luviEnabled) return;
 
         await processStaminaMessage(message);
-        await processExpeditionMessage(message);
         await processRaidMessage(message);
         await processRaidSpawnMessage(message);
         await processRaidWishlist(message);

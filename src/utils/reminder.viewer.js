@@ -1,114 +1,78 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const Reminder = require('../database/reminder.model');
 const { getUserSettings } = require('./user-settings.manager');
 const { BOT_OWNER_ID } = require('../config/constants');
 
-async function handleReminderView(message) {
-    if (message.author.id !== BOT_OWNER_ID) {
-        return message.reply('❌ Only the bot owner can use this command.');
-    }
+const typeNames = {
+    expedition: 'Expedition',
+    stamina: 'Stamina',
+    raid: 'Raid',
+    raidSpawn: 'Raid Spawn',
+    drop: 'Drop'
+};
 
-    // Delete old expired reminders (older than 1 hour and not sent)
+const typeEmojis = {
+    expedition: '🗺️',
+    stamina: '⚡',
+    raid: '⚔️',
+    raidSpawn: '🔔',
+    drop: '🎁'
+};
+
+async function fetchReminders() {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     await Reminder.deleteMany({
         remindAt: { $lt: oneHourAgo },
         status: { $ne: 'sent' }
     });
-
-    // Only get active (non-expired) reminders
-    const now = new Date();
-    const reminders = await Reminder.find({
+    return Reminder.find({
         status: { $ne: 'sent' },
-        remindAt: { $gte: now }
+        remindAt: { $gte: new Date() }
     }).sort({ remindAt: 1 });
-    
-    if (reminders.length === 0) {
-        return message.reply('❌ No active reminders found.');
-    }
-
-    await sendReminderPage(message, message.author.id, 0, 'all', reminders);
 }
 
-async function sendReminderPage(message, userId, page, filter, allReminders, interaction = null) {
-    let filtered = allReminders;
-    if (filter !== 'all') {
-        filtered = allReminders.filter(r => r.type === filter);
-    }
+async function buildPayload(userId, page, filter, reminders) {
+    let filtered = filter === 'all' ? reminders : reminders.filter(r => r.type === filter);
 
     const itemsPerPage = 5;
-    const totalPages = Math.ceil(filtered.length / itemsPerPage);
-    const start = page * itemsPerPage;
-    const pageReminders = filtered.slice(start, start + itemsPerPage);
-
-    const typeEmojis = {
-        expedition: '🗺️',
-        stamina: '⚡',
-        raid: '⚔️',
-        raidSpawn: '🔔',
-        drop: '🎁'
-    };
-
-    const typeNames = {
-        expedition: 'Expedition',
-        stamina: 'Stamina',
-        raid: 'Raid',
-        raidSpawn: 'Raid Spawn',
-        drop: 'Drop'
-    };
+    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+    page = Math.min(page, totalPages - 1);
+    const pageReminders = filtered.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
 
     const embed = new EmbedBuilder()
-        .setTitle(`📋 Active Reminders (${filter === 'all' ? 'All Types' : filter})`)
+        .setTitle(`📋 Active Reminders — ${filter === 'all' ? 'All Types' : `${typeEmojis[filter]} ${typeNames[filter]}`}`)
         .setColor(0x5865F2)
-        .setFooter({ text: `Page ${page + 1}/${totalPages || 1}` });
+        .setFooter({ text: `Page ${page + 1}/${totalPages} • ${filtered.length} total` });
 
     if (pageReminders.length === 0) {
-        embed.setDescription('No reminders in this category');
+        embed.setDescription('No reminders in this category.');
     } else {
-        const now = Date.now();
         const lines = await Promise.all(pageReminders.map(async r => {
             const time = Math.floor(r.remindAt.getTime() / 1000);
-            const typeName = typeNames[r.type] || r.type;
-            
-            // Get DM status
             const userSettings = await getUserSettings(r.userId);
-            let dmEnabled;
-            if (r.type === 'raid') {
-              dmEnabled = true; // raid always sends via DM
-            } else {
-              const dmField = `${r.type}DM`;
-              dmEnabled = userSettings?.[dmField] || false;
-            }
-            const dmStatus = dmEnabled ? '✅ DM' : '❌ DM';
-            
-            return `**${typeName}** | <@${r.userId}> - <t:${time}:R> | ${dmStatus}`;
+            let dmEnabled = r.type === 'raid' ? true : userSettings?.[`${r.type}DM`] || false;
+            return `${typeEmojis[r.type] || '🔔'} **${typeNames[r.type] || r.type}** | <@${r.userId}> — <t:${time}:R> | ${dmEnabled ? '✅ DM' : '❌ DM'}`;
         }));
         embed.setDescription(lines.join('\n'));
     }
 
-    const filterButtons1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`rem_expedition_${userId}_${page}_${filter}`)
-            .setLabel('Expedition')
-            .setStyle(filter === 'expedition' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`rem_stamina_${userId}_${page}_${filter}`)
-            .setLabel('Stamina')
-            .setStyle(filter === 'stamina' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`rem_raid_${userId}_${page}_${filter}`)
-            .setLabel('Raid')
-            .setStyle(filter === 'raid' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`rem_raidSpawn_${userId}_${page}_${filter}`)
-            .setLabel('Raid Spawn')
-            .setStyle(filter === 'raidSpawn' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`rem_drop_${userId}_${page}_${filter}`)
-            .setLabel('Drop')
-            .setStyle(filter === 'drop' ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    // Dropdown
+    const dropdown = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`rem_filter_${userId}_${page}`)
+            .setPlaceholder('Filter by type...')
+            .addOptions([
+                { label: 'All Types', value: 'all', emoji: '📋', default: filter === 'all' },
+                { label: 'Expedition', value: 'expedition', emoji: '🗺️', default: filter === 'expedition' },
+                { label: 'Stamina', value: 'stamina', emoji: '⚡', default: filter === 'stamina' },
+                { label: 'Raid', value: 'raid', emoji: '⚔️', default: filter === 'raid' },
+                { label: 'Raid Spawn', value: 'raidSpawn', emoji: '🔔', default: filter === 'raidSpawn' },
+                { label: 'Drop', value: 'drop', emoji: '🎁', default: filter === 'drop' },
+            ])
     );
 
-    const filterButtons2 = new ActionRowBuilder().addComponents(
+    // Pagination + Refresh
+    const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`rem_prev_${userId}_${page}_${filter}`)
             .setLabel('◀')
@@ -118,16 +82,26 @@ async function sendReminderPage(message, userId, page, filter, allReminders, int
             .setCustomId(`rem_next_${userId}_${page}_${filter}`)
             .setLabel('▶')
             .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page >= totalPages - 1)
+            .setDisabled(page >= totalPages - 1),
+        new ButtonBuilder()
+            .setCustomId(`rem_refresh_${userId}_${page}_${filter}`)
+            .setLabel('🔄 Refresh')
+            .setStyle(ButtonStyle.Primary)
     );
 
-    const payload = { embeds: [embed], components: [filterButtons1, filterButtons2], allowedMentions: { parse: [] } };
-    
-    if (interaction) {
-        await interaction.update(payload);
-    } else {
-        await message.reply(payload);
+    return { embeds: [embed], components: [dropdown, buttons], allowedMentions: { parse: [] } };
+}
+
+async function handleReminderView(message) {
+    if (message.author.id !== BOT_OWNER_ID) {
+        return message.reply('❌ Only the bot owner can use this command.');
     }
+
+    const reminders = await fetchReminders();
+    if (reminders.length === 0) return message.reply('❌ No active reminders found.');
+
+    const payload = await buildPayload(message.author.id, 0, 'all', reminders);
+    await message.reply(payload);
 }
 
 async function handleReminderInteraction(interaction) {
@@ -137,29 +111,28 @@ async function handleReminderInteraction(interaction) {
     const parts = customId.split('_');
     const action = parts[1];
     const userId = parts[2];
-    let page = parseInt(parts[3]);
-    let filter = parts[4];
+    let page = parseInt(parts[3]) || 0;
+    let filter = parts[4] || 'all';
 
     if (userId !== interaction.user.id) {
         await interaction.reply({ content: 'mat kr lala mat kr', ephemeral: true });
         return true;
     }
 
-    const reminders = await Reminder.find({
-        status: { $ne: 'sent' },
-        remindAt: { $gte: new Date() }
-    }).sort({ remindAt: 1 });
-
-    if (['expedition', 'stamina', 'raid', 'raidSpawn', 'drop'].includes(action)) {
-        filter = action;
+    // Dropdown select
+    if (action === 'filter') {
+        filter = interaction.values[0];
         page = 0;
     } else if (action === 'prev') {
         page = Math.max(0, page - 1);
     } else if (action === 'next') {
         page++;
     }
+    // refresh just re-fetches with same page/filter
 
-    await sendReminderPage(interaction.message, userId, page, filter, reminders, interaction);
+    const reminders = await fetchReminders();
+    const payload = await buildPayload(userId, page, filter, reminders);
+    await interaction.update(payload);
     return true;
 }
 

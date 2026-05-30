@@ -32,9 +32,10 @@ module.exports = {
         await addIdReaction(newMessage);
 
         // Skip reminder creation if MessageCreate already handled this message
-        if (wasProcessedOnCreate(newMessage.id)) return;
+        if (!wasProcessedOnCreate(newMessage.id)) {
+          await processRaidMessage(newMessage);
+        }
 
         await processExpeditionMessage(newMessage);
-        await processRaidMessage(newMessage);
     }
 };
