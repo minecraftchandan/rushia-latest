@@ -28,7 +28,8 @@ async function checkReminders(client) {
     }, {});
 
     const sendPromises = [];
-    const failedReminderIds = []; // Track reminders that fail to send
+    const failedReminderIds = [];
+    const sentReminderIds = [];
 
     for (const key in remindersToProcess) {
       const reminderData = remindersToProcess[key];
@@ -120,6 +121,7 @@ async function checkReminders(client) {
             
             if (sendSuccess) {
               await Reminder.markAsSent(reminderData.reminderIds);
+              sentReminderIds.push(...reminderData.reminderIds);
               sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} reminders as sent`);
             } else {
               failedReminderIds.push(...reminderData.reminderIds);
@@ -144,8 +146,11 @@ async function checkReminders(client) {
     await Promise.all(sendPromises);
 
     if (failedReminderIds.length > 0) {
-      await Reminder.revertClaimed(failedReminderIds);
-      sendLog(`[REMINDER] Reverted ${failedReminderIds.length} failed reminders for retry`);
+      const safeToRevert = failedReminderIds.filter(id => !sentReminderIds.some(s => s.equals(id)));
+      if (safeToRevert.length > 0) {
+        await Reminder.revertClaimed(safeToRevert);
+        sendLog(`[REMINDER] Reverted ${safeToRevert.length} failed reminders for retry`);
+      }
     }
 
   } catch (error) {

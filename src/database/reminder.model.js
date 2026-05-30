@@ -35,20 +35,19 @@ reminderSchema.index({ sentAt: 1 }, {
 // CLEANUP INDEX
 reminderSchema.index({ createdAt: 1, status: 1 }, { name: 'idx_cleanup' });
 
-// UNIQUE INDEX: Prevent duplicate expedition reminders — only while pending
+// UNIQUE INDEX: Prevent duplicate expedition reminders — pending and claimed
 reminderSchema.index({ userId: 1, cardId: 1, type: 1 }, {
   unique: true,
-  partialFilterExpression: { type: 'expedition', status: 'pending' },
+  partialFilterExpression: { type: 'expedition', status: { $in: ['pending', 'claimed'] } },
   name: 'idx_unique_expedition'
 });
 
-// UNIQUE INDEX: Prevent duplicate non-expedition reminders — only while pending
-// 'claimed' is intentionally excluded so the constraint holds until fully delivered
+// UNIQUE INDEX: Prevent duplicate non-expedition reminders — pending and claimed
 reminderSchema.index({ userId: 1, type: 1 }, {
   unique: true,
   partialFilterExpression: {
     type: { $in: ['stamina', 'raid', 'raidSpawn', 'drop'] },
-    status: 'pending'
+    status: { $in: ['pending', 'claimed'] }
   },
   name: 'idx_unique_type'
 });
