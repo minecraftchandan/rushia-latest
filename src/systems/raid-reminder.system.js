@@ -1,9 +1,7 @@
-const { parseRaidViewEmbed, parseRaidViewComponent, parseRaidAttackEmbed } = require('../utils/embed.parser');
+const { parseRaidViewEmbed, parseRaidViewComponent } = require('../utils/embed.parser');
 const Reminder = require('../database/reminder.model');
 const { sendLog, sendError } = require('../utils/logger');
 const { createReminderSafe, checkExistingReminder } = require('../utils/reminder-duplicate.checker');
-
-const FATIGUE_MILLIS = 10 * 60 * 1000;
 
 async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
   const remindAt = new Date(Date.now() + fatigueMillis);
@@ -40,16 +38,6 @@ async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
 async function processRaidMessage(message) {
   if (!message.guild) return;
 
-  const handledUserIds = new Set();
-
-  // Path 1: interaction metadata from /raid attack — most reliable, fixed 10 min
-  const attackInfo = parseRaidAttackEmbed(message);
-  if (attackInfo) {
-    handledUserIds.add(attackInfo.userId);
-    await createRaidReminder(attackInfo.userId, message.guild.id, message.channel.id, FATIGUE_MILLIS);
-  }
-
-  // Path 2: fatigue counter from raid view embed/component — skip users already handled above
   let raidInfo = null;
 
   if (message.components && message.components.length > 0) {
@@ -63,7 +51,6 @@ async function processRaidMessage(message) {
   if (!raidInfo) return;
 
   for (const { userId, fatigueMillis } of raidInfo) {
-    if (handledUserIds.has(userId)) continue;
     const existing = await checkExistingReminder(userId, 'raid');
     if (existing) continue;
     await createRaidReminder(userId, message.guild.id, message.channel.id, fatigueMillis);
