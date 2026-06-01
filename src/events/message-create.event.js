@@ -13,7 +13,6 @@ const { processPogMessage } = require('../systems/pog.system');
 const { processSeriesMessage } = require('../systems/series.system');
 const { LUVI_BOT_ID, SOFI_BOT_ID } = require('../config/constants');
 const { addIdReaction } = require('../systems/id-fetch.system');
-const messageUpdateEvent = require('./message-update.event');
 
 module.exports = {
     name: Events.MessageCreate,
@@ -331,7 +330,7 @@ module.exports = {
         if (!settings?.luviEnabled) return;
 
         await processStaminaMessage(message);
-        await processRaidMessage(message);
+        const raidHandled = await processRaidMessage(message);
         await processRaidSpawnMessage(message);
         await processRaidWishlist(message);
         await processDropMessage(message);
@@ -341,6 +340,5 @@ module.exports = {
         await processBossMessage(message);
         await processGeneratorMessage(message);
         await addIdReaction(message);
-        messageUpdateEvent.markProcessed(message.id);
     }
 };

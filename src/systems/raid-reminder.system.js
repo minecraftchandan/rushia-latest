@@ -36,7 +36,7 @@ async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
 }
 
 async function processRaidMessage(message) {
-  if (!message.guild) return;
+  if (!message.guild) return false;
 
   let raidInfo = null;
 
@@ -48,13 +48,15 @@ async function processRaidMessage(message) {
     raidInfo = parseRaidViewEmbed(message.embeds[0]);
   }
 
-  if (!raidInfo) return;
+  if (!raidInfo) return false;
 
   for (const { userId, fatigueMillis } of raidInfo) {
     const existing = await checkExistingReminder(userId, 'raid');
     if (existing) continue;
     await createRaidReminder(userId, message.guild.id, message.channel.id, fatigueMillis);
   }
+
+  return true;
 }
 
 module.exports = { processRaidMessage };
