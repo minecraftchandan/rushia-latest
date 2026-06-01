@@ -168,6 +168,15 @@ async function deployCommands(client) {
         
         console.log('⏰ Starting reminder scheduler...');
         const Reminder = require('./src/database/reminder.model');
+        // Delete reminders that were due more than 5 minutes ago (bot was down too long)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const stale = await Reminder.deleteMany({
+          status: 'pending',
+          remindAt: { $lt: fiveMinutesAgo }
+        });
+        if (stale.deletedCount > 0) {
+          await sendLog(`[STARTUP] Deleted ${stale.deletedCount} stale reminders`, { category: 'SYSTEM' });
+        }
         const stuckCount = await Reminder.updateMany(
           { status: 'claimed', createdAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
           { $set: { status: 'pending' } }
