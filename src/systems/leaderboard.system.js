@@ -8,60 +8,45 @@ async function handleRlbCommand(message) {
   const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = message.author.id === BOT_OWNER_ID;
   const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
-  const canPaginate = isOwner || isAdmin;
 
   try {
     const guildId = message.guild.id;
-    
-    // Get all droppers in this server
-    const allDroppers = await Drops.find({ guildId })
-      .sort({ drop_count: -1 });
+    const allDroppers = await Drops.find({ guildId }).sort({ drop_count: -1 });
 
     if (allDroppers.length === 0) {
       return message.channel.send('📊 No drops tracked yet in this server.').catch(() => {});
     }
 
-    // Show top 10 for regular users, paginated for admin/owner
     const page = 0;
     const perPage = 10;
-    const topDroppers = allDroppers.slice(page * perPage, (page + 1) * perPage);
+    const topDroppers = allDroppers.slice(0, perPage);
     const totalDrops = allDroppers.reduce((sum, user) => sum + user.drop_count, 0);
+    const totalPages = Math.ceil(allDroppers.length / perPage);
 
-    // Build leaderboard embed
-    const totalParticipants = allDroppers.length;
-    
     const embed = new EmbedBuilder()
-      .setAuthor({ 
-        name: message.guild.name, 
-        iconURL: message.guild.iconURL({ dynamic: true }) 
-      })
+      .setAuthor({ name: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) })
       .setTitle('🎴 Drop Leaderboard')
       .setThumbnail('https://cdn.discordapp.com/attachments/1446564927983849593/1466067284530434181/image0.gif')
       .setColor(0x0099ff);
 
     let rankings = '`S.No` • `Drops` • `User`\n';
-    const maxDrops = Math.max(...topDroppers.map(u => u.drop_count));
-    const maxWidth = Math.max(maxDrops.toString().length, 5);
+    const maxWidth = Math.max(...topDroppers.map(u => u.drop_count.toString().length), 5);
     for (let i = 0; i < topDroppers.length; i++) {
       const user = topDroppers[i];
-      const rank = `${(page * perPage) + i + 1}]`.padEnd(4, ' ');
-      const drops = user.drop_count.toString().padStart(maxWidth, ' ');
-      rankings += `\`${rank}\` • \`${drops}\` • <@${user.userId}>\n`;
+      rankings += `\`${(i + 1) + ']'.padEnd(3)}\` • \`${user.drop_count.toString().padStart(maxWidth)}\` • <@${user.userId}>\n`;
     }
     embed.addFields({ name: '\u200b', value: rankings });
-    
-    if (canPaginate) {
-      const totalPages = Math.ceil(allDroppers.length / perPage);
-      embed.setFooter({ text: `Page ${page + 1}/${totalPages} | Participants: ${totalParticipants} | Total Drops: ${totalDrops}` });
-    } else {
-      embed.setFooter({ text: `Participants: ${totalParticipants} | Total Drops: ${totalDrops}` });
-    }
+    embed.setFooter({ text: `Page 1/${totalPages} | Participants: ${allDroppers.length} | Total Drops: ${totalDrops}` });
 
-    // Add buttons
     const rarityButton = new ButtonBuilder()
       .setCustomId(`view_rarity_drops_${message.author.id}`)
       .setLabel('Rare Drops')
       .setStyle(ButtonStyle.Primary);
+
+    const clashButton = new ButtonBuilder()
+      .setCustomId(`view_clash_lb_${message.author.id}`)
+      .setLabel('Clash')
+      .setStyle(ButtonStyle.Success);
 
     const resetButton = new ButtonBuilder()
       .setCustomId(`reset_drops_${message.author.id}`)
@@ -70,43 +55,27 @@ async function handleRlbCommand(message) {
       .setEmoji('🔄')
       .setDisabled(!isOwner && !isAdmin);
 
-    const clashButton = new ButtonBuilder()
-      .setCustomId(`view_clash_lb_${message.author.id}`)
-      .setLabel('Clash')
-      .setStyle(ButtonStyle.Success);
+    const prevButton = new ButtonBuilder()
+      .setCustomId(`rlb_prev_${message.author.id}_0`)
+      .setLabel('◀')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true);
 
-    const components = [rarityButton, clashButton, resetButton];
+    const nextButton = new ButtonBuilder()
+      .setCustomId(`rlb_next_${message.author.id}_0`)
+      .setLabel('▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(allDroppers.length <= perPage);
 
-    // Add pagination for admin/owner if more than 10 entries
-    if (canPaginate && allDroppers.length > perPage) {
-      const prevButton = new ButtonBuilder()
-        .setCustomId(`rlb_prev_${message.author.id}_${page}`)
-        .setLabel('◀')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page === 0);
-      
-      const nextButton = new ButtonBuilder()
-        .setCustomId(`rlb_next_${message.author.id}_${page}`)
-        .setLabel('▶')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled((page + 1) * perPage >= allDroppers.length);
-      
-      components.push(prevButton, nextButton);
-    }
-
-    const row = new ActionRowBuilder().addComponents(components);
+    const row = new ActionRowBuilder().addComponents(rarityButton, clashButton, resetButton, prevButton, nextButton);
 
     const reply = await message.channel.send({ embeds: [embed], components: [row] }).catch(() => {});
-    
-    // Disable buttons after 5 minutes
+
     setTimeout(async () => {
       try {
-        const disabledComponents = components.map(btn => ButtonBuilder.from(btn).setDisabled(true));
-        const disabledRow = new ActionRowBuilder().addComponents(disabledComponents);
-        await reply.edit({ components: [disabledRow] }).catch(() => {});
-      } catch (error) {
-        // Silent fail
-      }
+        const disabled = [rarityButton, clashButton, resetButton, prevButton, nextButton].map(btn => ButtonBuilder.from(btn).setDisabled(true));
+        await reply.edit({ components: [new ActionRowBuilder().addComponents(disabled)] }).catch(() => {});
+      } catch {}
     }, 5 * 60 * 1000);
 
   } catch (error) {
@@ -218,7 +187,6 @@ async function handleBackButton(interaction) {
     const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
     const isOwner = interaction.user.id === BOT_OWNER_ID;
     const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-    const canPaginate = isOwner || isAdmin;
 
     const guildId = interaction.guild.id;
     const allDroppers = await Drops.find({ guildId }).sort({ drop_count: -1 });
@@ -226,33 +194,23 @@ async function handleBackButton(interaction) {
     const page = currentPage || 0;
     const topDroppers = allDroppers.slice(page * perPage, (page + 1) * perPage);
     const totalDrops = allDroppers.reduce((sum, user) => sum + user.drop_count, 0);
+    const totalPages = Math.ceil(allDroppers.length / perPage);
 
     const embed = new EmbedBuilder()
-      .setAuthor({ 
-        name: interaction.guild.name, 
-        iconURL: interaction.guild.iconURL({ dynamic: true }) 
-      })
+      .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) })
       .setTitle('🎴 Drop Leaderboard')
       .setThumbnail('https://cdn.discordapp.com/attachments/1446564927983849593/1466067284530434181/image0.gif')
       .setColor(0x0099ff);
 
     let rankings = '`S.No` • `Drops` • `User`\n';
-    const maxDrops = Math.max(...topDroppers.map(u => u.drop_count));
-    const maxWidth = Math.max(maxDrops.toString().length, 5);
+    const maxWidth = Math.max(...topDroppers.map(u => u.drop_count.toString().length), 5);
     for (let i = 0; i < topDroppers.length; i++) {
       const user = topDroppers[i];
       const rank = `${(page * perPage) + i + 1}]`.padEnd(4, ' ');
-      const drops = user.drop_count.toString().padStart(maxWidth, ' ');
-      rankings += `\`${rank}\` • \`${drops}\` • <@${user.userId}>\n`;
+      rankings += `\`${rank}\` • \`${user.drop_count.toString().padStart(maxWidth)}\` • <@${user.userId}>\n`;
     }
     embed.addFields({ name: '\u200b', value: rankings });
-    
-    if (canPaginate) {
-      const totalPages = Math.ceil(allDroppers.length / perPage);
-      embed.setFooter({ text: `Page ${page + 1}/${totalPages} | Participants: ${allDroppers.length} | Total Drops: ${totalDrops}` });
-    } else {
-      embed.setFooter({ text: `Participants: ${allDroppers.length} | Total Drops: ${totalDrops}` });
-    }
+    embed.setFooter({ text: `Page ${page + 1}/${totalPages} | Participants: ${allDroppers.length} | Total Drops: ${totalDrops}` });
 
     const rarityButton = new ButtonBuilder()
       .setCustomId(`view_rarity_drops_${interaction.user.id}_${page}`)
@@ -271,23 +229,19 @@ async function handleBackButton(interaction) {
       .setEmoji('🔄')
       .setDisabled(!isOwner && !isAdmin);
 
-    const components = [rarityButton, clashButton, resetButton];
+    const prevButton = new ButtonBuilder()
+      .setCustomId(`rlb_prev_${interaction.user.id}_${page}`)
+      .setLabel('◀')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page === 0);
 
-    if (canPaginate && allDroppers.length > perPage) {
-      const prevButton = new ButtonBuilder()
-        .setCustomId(`rlb_prev_${interaction.user.id}_${page}`)
-        .setLabel('◀')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page === 0);
-      
-      const nextButton = new ButtonBuilder()
-        .setCustomId(`rlb_next_${interaction.user.id}_${page}`)
-        .setLabel('▶')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled((page + 1) * perPage >= allDroppers.length);
-      
-      components.push(prevButton, nextButton);
-    }
+    const nextButton = new ButtonBuilder()
+      .setCustomId(`rlb_next_${interaction.user.id}_${page}`)
+      .setLabel('▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled((page + 1) * perPage >= allDroppers.length);
+
+    const components = [rarityButton, clashButton, resetButton, prevButton, nextButton];
 
     const row = new ActionRowBuilder().addComponents(components);
     await interaction.update({ embeds: [embed], components: [row] });
@@ -453,11 +407,6 @@ async function handleRlbPagination(interaction) {
   const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = interaction.user.id === BOT_OWNER_ID;
   const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-
-  if (!isOwner && !isAdmin) {
-    await interaction.reply({ content: '❌ Only admins can paginate.', ephemeral: true });
-    return true;
-  }
 
   const guildId = interaction.guild.id;
   const allDroppers = await Drops.find({ guildId }).sort({ drop_count: -1 });
