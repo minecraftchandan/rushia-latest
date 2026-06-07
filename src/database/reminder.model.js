@@ -57,8 +57,8 @@ reminderSchema.statics.upsertReminder = async function(reminderData) {
   const { userId, type, cardId, channelId, guildId, ...updateData } = reminderData;
 
   const filter = cardId
-    ? { userId, type, cardId, status: 'pending' }
-    : { userId, type, status: 'pending' };
+    ? { userId, type, cardId, status: { $in: ['pending', 'claimed'] } }
+    : { userId, type, status: { $in: ['pending', 'claimed'] } };
 
   return await this.findOneAndUpdate(
     filter,

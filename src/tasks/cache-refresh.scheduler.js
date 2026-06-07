@@ -1,6 +1,6 @@
 const settingsManager = require('../utils/settings.manager');
 const userSettingsManager = require('../utils/user-settings.manager');
-const { sendLog } = require('../utils/logger');
+const { sendLog, sendError } = require('../utils/logger');
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 let client = null;
@@ -33,8 +33,7 @@ async function refreshAllCaches() {
       await settingsManager.initializeSettings();
     }
     
-    // User settings refresh (keep limited)
-    await userSettingsManager.initializeUserSettings();
+    // User settings are cache-aside (loaded on demand) — no bulk reload needed.
   } catch (error) {
     sendError('Cache refresh error:', error);
   }

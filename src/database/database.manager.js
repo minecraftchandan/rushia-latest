@@ -48,15 +48,11 @@ class DatabaseManager {
       try {
         const PogGuild = require('./pog-guild.model');
         const Series = require('./series.model');
-        
-        // Sync indexes (will update existing indexes if needed)
         await PogGuild.syncIndexes();
         await Series.syncIndexes();
-        
-        sendLog('✅ POG database indexes created');
       } catch (pogError) {
-        sendError('⚠️ POG database indexes failed:', pogError.message);
-        // Don't throw - POG features are optional
+        const { sendError } = require('../utils/logger');
+        await sendError(`POG database indexes failed: ${pogError.message}`);
       }
     } catch (error) {
       const { sendError } = require('../utils/logger');

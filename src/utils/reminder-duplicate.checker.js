@@ -13,7 +13,7 @@ async function createReminderSafe(reminderData) {
 }
 
 async function checkExistingReminder(userId, type, cardId = null) {
-  const query = { userId, type, status: 'pending' };
+  const query = { userId, type, status: { $in: ['pending', 'claimed'] } };
   if (cardId) query.cardId = cardId;
   
   return await Reminder.findOne(query).lean().exec();

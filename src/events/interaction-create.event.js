@@ -1,7 +1,5 @@
 const { Events } = require('discord.js');
-const Reminder = require('../database/reminder.model');
 const { sendLog, sendError } = require('../utils/logger');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const RateLimiter = require('../optimization/rate.limiter');
 const {
   handleNameSelect,
@@ -212,59 +210,6 @@ module.exports = {
                 sendError('Error handling button:', error);
             }
 
-            const { customId, user, channel, message } = interaction;
-
-            if (customId.startsWith('stamina_')) {
-                const mentionedUserIdMatch = message.content.match(/<@(\d+)>/);
-                const mentionedUserId = mentionedUserIdMatch ? mentionedUserIdMatch[1] : null;
-
-                if (mentionedUserId && user.id !== mentionedUserId) {
-                    return interaction.reply({ content: "You can't interact with this button.", flags: 1 << 6 });
-                }
-
-                await interaction.deferReply({ flags: 1 << 6 });
-
-                const percentage = parseInt(customId.split('_')[1], 10);
-                const maxStamina = 50;
-                const staminaToRegen = (maxStamina * percentage) / 100;
-                const minutesToRegen = staminaToRegen * 2;
-                const remindAt = new Date(Date.now() + minutesToRegen * 60 * 1000);
-
-                try {
-                    const existingReminder = await Reminder.findOne({ userId: user.id, type: 'stamina' });
-                    let confirmationMessage = `You will be reminded when your stamina reaches ${percentage}%.`;
-
-                    if (existingReminder) {
-                        await Reminder.deleteOne({ _id: existingReminder._id });
-                        confirmationMessage = `Your previous stamina reminder was overwritten. You will now be reminded when when your stamina reaches ${percentage}%.`;
-                    } else {
-                        confirmationMessage = `You will be reminded when your stamina reaches ${percentage}%.`;
-                    }
-
-                    await Reminder.create({
-                        userId: user.id,
-                        channelId: channel.id,
-                        remindAt,
-                        type: 'stamina',
-                        reminderMessage: `<@${user.id}>, your stamina has regenerated to ${percentage}%!\n-# you can configure your notifications via /notifications set/view`
-                    });
-
-                    await interaction.editReply({ content: confirmationMessage });
-
-                    const originalMessage = interaction.message;
-                    const disabledRow = new ActionRowBuilder()
-                        .addComponents(
-                            new ButtonBuilder().setCustomId('stamina_25').setLabel('Remind at 25% Stamina').setStyle(ButtonStyle.Primary).setDisabled(true),
-                            new ButtonBuilder().setCustomId('stamina_50').setLabel('Remind at 50% Stamina').setStyle(ButtonStyle.Primary).setDisabled(true),
-                            new ButtonBuilder().setCustomId('stamina_100').setLabel('Remind at 100% Stamina').setStyle(ButtonStyle.Primary).setDisabled(true),
-                        );
-                    await originalMessage.edit({ components: [disabledRow] });
-                } catch (error) {
-                    sendError(`[ERROR] Failed to create stamina reminder: ${error.message}`, error);
-                    await sendError(`[ERROR] Failed to create stamina reminder: ${error.message}`);
-                    await interaction.editReply({ content: 'Sorry, there was an error setting your reminder.' });
-                }
-            }
         }
     }
 };

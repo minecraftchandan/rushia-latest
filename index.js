@@ -181,7 +181,7 @@ async function deployCommands(client) {
           await sendLog(`[STARTUP] Deleted ${stale.deletedCount} stale reminders`, { category: 'SYSTEM' });
         }
         const stuckCount = await Reminder.updateMany(
-          { status: 'claimed', createdAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
+          { status: 'claimed', remindAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
           { $set: { status: 'pending' } }
         );
         if (stuckCount.modifiedCount > 0) {

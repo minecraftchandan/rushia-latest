@@ -5,9 +5,9 @@ const MAX_CACHE_SIZE = 1000; // Prevent unlimited growth
 class CacheManager {
   // User Settings
   static setUserSettings(userId, data) {
+    userSettingsCache.delete(userId); // refresh insertion order
     if (userSettingsCache.size >= MAX_CACHE_SIZE) {
-      const firstKey = userSettingsCache.keys().next().value;
-      userSettingsCache.delete(firstKey);
+      userSettingsCache.delete(userSettingsCache.keys().next().value);
     }
     userSettingsCache.set(userId, data);
   }
@@ -28,9 +28,9 @@ class CacheManager {
 
   // Guild Settings
   static setGuildSettings(guildId, data) {
+    guildSettingsCache.delete(guildId); // refresh insertion order
     if (guildSettingsCache.size >= MAX_CACHE_SIZE) {
-      const firstKey = guildSettingsCache.keys().next().value;
-      guildSettingsCache.delete(firstKey);
+      guildSettingsCache.delete(guildSettingsCache.keys().next().value);
     }
     guildSettingsCache.set(guildId, data);
   }
