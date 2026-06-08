@@ -52,6 +52,15 @@ async function checkReminders(client) {
             });
           }
 
+          // If settings still null (DB failure), default to sending so reminders aren't lost
+          if (!userSettings) {
+            userSettings = {
+              expedition: true, stamina: true, raid: true, drop: true,
+              raidSpawnReminder: true, staminaDM: false, expeditionDM: false,
+              dropDM: false, raidSpawnDM: false
+            };
+          }
+
           const sendReminder = userSettings[reminderData.type] !== false;
           let sendInDm = false;
           // raidSpawnReminder is the settings key for raidSpawn type
