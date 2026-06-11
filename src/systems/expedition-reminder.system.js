@@ -1,5 +1,5 @@
 const { parseExpeditionEmbed, parseExpeditionComponent } = require('../utils/embed.parser');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const { createReminderSafe } = require('../utils/reminder-duplicate.checker');
 
 async function processExpeditionMessage(message) {
@@ -88,7 +88,7 @@ async function processExpeditionMessage(message) {
     });
 
     if (result.success) {
-      await sendLog('REMINDER_CREATED', { 
+      await logInfo('REMINDER_CREATED', { 
         category: 'REMINDER',
         action: 'CREATED',
         type: 'expedition',
@@ -99,7 +99,7 @@ async function processExpeditionMessage(message) {
         remindAt: group.remindAt.toISOString()
       });
     } else if (result.reason !== 'duplicate') {
-      await sendError('REMINDER_CREATE_FAILED', { 
+      await logError('REMINDER_CREATE_FAILED', { 
         category: 'REMINDER',
         action: 'CREATE_FAILED',
         type: 'expedition',

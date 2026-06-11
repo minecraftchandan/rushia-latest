@@ -1,5 +1,5 @@
 const Reminder = require('../database/reminder.model');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const { checkExistingReminder, createReminderSafe } = require('../utils/reminder-duplicate.checker');
 
 const LUVI_ID = '1269481871021047891';
@@ -61,7 +61,7 @@ async function detectAndSetRaidSpawnReminder(message) {
   });
 
   if (result.success) {
-    await sendLog('REMINDER_CREATED', {
+    await logInfo('REMINDER_CREATED', {
       category: 'REMINDER',
       action: 'CREATED',
       type: 'raidSpawn',
@@ -71,7 +71,7 @@ async function detectAndSetRaidSpawnReminder(message) {
       remindAt: remindAt.toISOString()
     });
   } else if (result.reason !== 'duplicate') {
-    await sendError('REMINDER_CREATE_FAILED', {
+    await logError('REMINDER_CREATE_FAILED', {
       category: 'REMINDER',
       action: 'CREATE_FAILED',
       type: 'raidSpawn',

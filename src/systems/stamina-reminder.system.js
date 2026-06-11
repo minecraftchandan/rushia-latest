@@ -1,5 +1,5 @@
 const Reminder = require('../database/reminder.model');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const { STAMINA } = require('../config/constants');
 
 async function processStaminaMessage(message) {
@@ -37,7 +37,7 @@ async function processStaminaMessage(message) {
       await message.channel.send({
         content: `<@${userId}>, I'll remind you when your stamina is 10/10.`,
       });
-      await sendLog('REMINDER_CREATED', { 
+      await logInfo('REMINDER_CREATED', { 
         category: 'REMINDER',
         action: 'CREATED',
         type: 'stamina',
@@ -47,7 +47,7 @@ async function processStaminaMessage(message) {
         remindAt: remindAt.toISOString()
       });
     } catch (error) {
-      await sendError('REMINDER_CREATE_FAILED', { 
+      await logError('REMINDER_CREATE_FAILED', { 
         category: 'REMINDER',
         action: 'CREATE_FAILED',
         type: 'stamina',

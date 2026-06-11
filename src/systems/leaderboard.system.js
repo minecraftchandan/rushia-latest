@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const Drops = require('../database/drops.model');
 const RarityDrop = require('../database/rarity-drop.model');
 const ClashCount = require('../database/clash-count.model');
@@ -247,7 +247,7 @@ async function handleBackButton(interaction) {
     await interaction.update({ embeds: [embed], components: [row] });
 
   } catch (error) {
-    sendError('Back button error:', error);
+    await logError('Back button error', error);
   }
 }
 
@@ -383,7 +383,7 @@ async function handleClashButton(interaction) {
       .setEmoji('⬅️');
     await interaction.update({ embeds: [embed], components: [new ActionRowBuilder().addComponents(back)] });
   } catch (error) {
-    sendError('Clash lb error:', error);
+    await logError('Clash lb error', error);
     await interaction.update({ content: '❌ An error occurred.', embeds: [], components: [] });
   }
 }

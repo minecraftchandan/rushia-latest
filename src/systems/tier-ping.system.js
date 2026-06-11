@@ -1,6 +1,6 @@
 const { parseBossEmbed, parseBossComponent } = require('../utils/embed.parser');
 const { getSettings } = require('../utils/settings.manager');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const { getRoleDelay } = require('../utils/role-delay.manager');
 const { PermissionsBitField } = require('discord.js');
 
@@ -22,18 +22,18 @@ async function processBossMessage(message) {
 
   if (!bossInfo) return;
 
-  sendLog(`[BOSS] Detected boss: ${bossInfo.bossName} (${bossInfo.tier})`);
+  await logInfo('Boss detected', { category: 'BOSS', metadata: { bossName: bossInfo.bossName, tier: bossInfo.tier } });
 
   const settings = await getSettings(message.guild.id);
   if (!settings) {
-    sendLog(`[BOSS] No settings found for guild ${message.guild.id}`);
+  await logInfo('No settings found', { category: 'BOSS', guildId: message.guild.id });
     return;
   }
 
   const roleConfig = settings.multiRoleEnabled 
     ? `Multi-role: T1=${settings.tier1RoleId || 'none'}, T2=${settings.tier2RoleId || 'none'}, T3=${settings.tier3RoleId || 'none'}, T4=${settings.tier4RoleId || 'none'}`
     : `Single role: ${settings.bossRoleId || 'none'}`;
-  sendLog(`[BOSS] ${roleConfig}`);
+  await logInfo('Role config', { category: 'BOSS', metadata: { config: roleConfig } });
 
   let roleId = null;
   
@@ -58,10 +58,7 @@ async function processBossMessage(message) {
     try {
       const role = message.guild.roles.cache.get(roleId);
       if (!role) {
-        await sendLog(`[BOSS ERROR] Role not found: ${roleId} in guild ${message.guild.name}`, { 
-          guildId: message.guild.id,
-          error: 'ROLE_NOT_FOUND'
-        });
+        await logError('Role not found', error, { guildId: message.guild.id, roleId, category: 'BOSS' });
         return;
       }
 
@@ -71,15 +68,7 @@ async function processBossMessage(message) {
       const roleIsMentionable = role.mentionable;
 
       if (!hasMentionPerm && !botAboveRole && !roleIsMentionable) {
-        await sendLog(`[BOSS PERM ERROR] Missing permissions to ping role "${role.name}" in channel #${message.channel.name} (${message.guild.name})`, {
-          guildId: message.guild.id,
-          channelId: message.channel.id,
-          roleId: roleId,
-          roleName: role.name,
-          channelName: message.channel.name,
-          serverName: message.guild.name,
-          error: 'MISSING_PING_PERMISSION'
-        });
+        await logError('Missing permissions to ping role', error, { guildId: message.guild.id, channelId: message.channel.id, roleId, category: 'BOSS' });
         return;
       }
 
@@ -93,19 +82,17 @@ async function processBossMessage(message) {
         setTimeout(() => {
           message.channel.send({ content, allowedMentions: { roles: [roleId] } })
             .catch(err => {
-              sendError(`[ERROR] Failed to send delayed boss ping: ${err.message}`, err);
-              sendError(`[ERROR] Failed to send delayed boss ping: ${err.message}`);
+              await logError('Failed to send delayed boss ping', err, { category: 'BOSS' });
             });
         }, delayMs);
-        await sendLog(`[BOSS DETECTED] ${bossInfo.bossName} (${bossInfo.tier}) in guild ${message.guild.name} (delayed by ${delayMs}ms)`);
+        await logInfo('Boss ping sent (delayed)', { category: 'BOSS', metadata: { bossName: bossInfo.bossName, tier: bossInfo.tier, delay: delayMs, guildName: message.guild.name } });
       } else {
         // Send immediately
         await message.channel.send({ content, allowedMentions: { roles: [roleId] } });
-        await sendLog(`[BOSS DETECTED] ${bossInfo.bossName} (${bossInfo.tier}) in guild ${message.guild.name}`);
+        await logInfo('Boss ping sent', { category: 'BOSS', metadata: { bossName: bossInfo.bossName, tier: bossInfo.tier, guildName: message.guild.name } });
       }
     } catch (err) {
-      sendError(`[ERROR] Failed to send boss ping: ${err.message}`, err);
-      await sendError(`[ERROR] Failed to send boss ping: ${err.message}`);
+      await logError('Failed to send boss ping', err, { category: 'BOSS' });
     }
   }
 }

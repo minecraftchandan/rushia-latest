@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { getUserSettings } = require('../utils/user-settings.manager');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 
 const LUVI_ID = '1269481871021047891';
 const timeoutMap = new Map();

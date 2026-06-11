@@ -1,6 +1,6 @@
 const RarityDrop = require('../database/rarity-drop.model');
 const { parseCardEmbed } = require('../utils/embed.parser');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 
 const LUVI_ID = '1269481871021047891';
 

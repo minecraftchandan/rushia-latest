@@ -1,5 +1,5 @@
 const Series = require('../database/series.model');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const { SOFI_BOT_ID } = require('../config/constants');
 
 // In-memory cache for series data

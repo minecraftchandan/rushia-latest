@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const BotSettings = require('../database/bot-settings.model');
 const { BOT_OWNER_ID, COLORS } = require('../config/constants');
 
@@ -64,7 +64,7 @@ module.exports = {
 
       await interaction.reply({ embeds: [embed], flags: 1 << 6 });
     } catch (error) {
-      sendError(`[ERROR] Failed to view settings: ${error.message}`, error);
+      await logError('Failed to view settings', error);
       await interaction.reply({ content: '❌ An error occurred while trying to view settings.', flags: 1 << 6 });
     }
   },

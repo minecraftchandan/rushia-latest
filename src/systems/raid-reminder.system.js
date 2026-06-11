@@ -1,6 +1,6 @@
 const { parseRaidViewEmbed, parseRaidViewComponent } = require('../utils/embed.parser');
 const Reminder = require('../database/reminder.model');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const { createReminderSafe, checkExistingReminder } = require('../utils/reminder-duplicate.checker');
 
 async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
@@ -15,7 +15,7 @@ async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
   });
 
   if (result.success) {
-    await sendLog('REMINDER_CREATED', {
+    await logInfo('REMINDER_CREATED', {
       category: 'REMINDER',
       action: 'CREATED',
       type: 'raid',
@@ -25,7 +25,7 @@ async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
       remindAt: remindAt.toISOString()
     });
   } else if (result.reason !== 'duplicate') {
-    await sendError('REMINDER_CREATE_FAILED', {
+    await logError('REMINDER_CREATE_FAILED', {
       category: 'REMINDER',
       action: 'CREATE_FAILED',
       type: 'raid',
