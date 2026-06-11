@@ -79,9 +79,9 @@ async function processBossMessage(message) {
       
       if (delayMs > 0) {
         // Send after delay
-        setTimeout(() => {
+        setTimeout(async () => {
           message.channel.send({ content, allowedMentions: { roles: [roleId] } })
-            .catch(err => {
+            .catch(async err => {
               await logError('Failed to send delayed boss ping', err, { category: 'BOSS' });
             });
         }, delayMs);
