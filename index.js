@@ -13,11 +13,10 @@ const {
 const fs = require('fs');
 const path = require('path');
 const { startScheduler } = require('./src/tasks/reminder.scheduler');
-const { startCacheRefreshScheduler, setClient: setCacheClient } = require('./src/tasks/cache-refresh.scheduler');
+const { initializeSettingsCache } = require('./src/tasks/cache-refresh.scheduler');
 const { initializeSettings } = require('./src/utils/settings.manager');
-const { initializeUserSettings } = require('./src/utils/user-settings.manager');
 const DatabaseManager = require('./src/database/database.manager');
-const { sendLog, sendError, initializeLogsDB, silenceConsole } = require('./src/utils/logger');
+const { sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
 
 const client = new Client({
@@ -28,6 +27,9 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
   ],
 });
+
+// Increase max listeners to prevent memory leak warnings
+client.setMaxListeners(25);
 
 // Load commands from ./commands folder
 client.commands = new Collection();
@@ -60,6 +62,23 @@ for (const file of eventFiles) {
 
 // Load event handlers from ./events folder
 const { handleGeneratorReaction } = require('./src/systems/message-generator.system');
+
+// Track scheduler state
+let reminderSchedulerStarted = false;
+
+// Handle bot disconnect to stop scheduler
+client.on(Events.ShardDisconnect, async () => {
+  if (reminderSchedulerStarted) {
+    const { stopScheduler } = require('./src/tasks/reminder.scheduler');
+    stopScheduler();
+    reminderSchedulerStarted = false;
+    await sendLog('SCHEDULER_STOPPED', { category: 'SYSTEM', reason: 'SHARD_DISCONNECT' }).catch(() => {});
+  }
+});
+
+client.on(Events.Error, (error) => {
+  sendError(`[CLIENT ERROR] ${error.stack || error.message}`).catch(() => {});
+});
 
 // Handle reactions for generator system and card rarity system
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
@@ -166,7 +185,6 @@ async function deployCommands(client) {
         
         console.log('📂 Initializing settings cache...');
         await initializeSettings();
-        await initializeUserSettings();
         console.log('✅ Settings cache initialized');
         
         console.log('⏰ Starting reminder scheduler...');
@@ -187,19 +205,15 @@ async function deployCommands(client) {
         if (stuckCount.modifiedCount > 0) {
           await sendLog(`[STARTUP] Recovered ${stuckCount.modifiedCount} stuck claimed reminders`, { category: 'SYSTEM' });
         }
-        startScheduler(readyClient);
+        if (!reminderSchedulerStarted) {
+          startScheduler(readyClient);
+          reminderSchedulerStarted = true;
+        }
         console.log('✅ Reminder scheduler started');
-        
-        console.log('🗄️ Starting cache refresh scheduler...');
-        setCacheClient(readyClient);
-        startCacheRefreshScheduler();
-        console.log('✅ Cache refresh scheduler started (every 5 minutes)');
         
         console.log('📦 Initializing inventory helper...');
         handleCardInventorySystem(readyClient);
         console.log('✅ Inventory helper initialized');
-        
-        console.log('🎮 Setting up bot activities...');
         
         console.log('🎮 Setting up bot activities...');
         const activities = [

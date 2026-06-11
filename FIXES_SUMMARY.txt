@@ -1,0 +1,380 @@
+================================================================================
+RUSHIA REMINDER SYSTEM - ALL FIXES AND UPDATES
+================================================================================
+
+OVERVIEW:
+This document lists all bugs fixed and improvements made to the reminder system,
+with detailed explanations and testing recommendations.
+
+================================================================================
+1. DUPLICATE CHECK BUG (reminder-duplicate.checker.js)
+================================================================================
+
+ISSUE:
+- checkExistingReminder() only checked for 'pending' status reminders
+- Missed 'claimed' reminders (actively being processed by scheduler)
+- Caused reminders to be created twice or silently fail
+
+FIX:
+- Changed query to check both 'pending' AND 'claimed' statuses
+- Now: { status: { $in: ['pending', 'claimed'] } }
+
+BEFORE:
+async function checkExistingReminder(userId, type, cardId = null) {
+  const query = { userId, type, status: 'pending' };
+  ...
+}
+
+AFTER:
+async function checkExistingReminder(userId, type, cardId = null) {
+  const query = { userId, type, status: { $in: ['pending', 'claimed'] } };
+  ...
+}
+
+IMPACT: Fixes reminders being created multiple times or lost entirely.
+
+================================================================================
+2. OBJECTID COMPARISON BUG (reminder.scheduler.js)
+================================================================================
+
+ISSUE:
+- Used .equals() method on plain JavaScript objects from .lean()
+- .lean() returns plain objects, not Mongoose documents, so .equals() doesn't exist
+- Silently failed to compare IDs, reverted ALL failed reminders including sent ones
+- Caused duplicate reminders to be sent
+
+FIX:
+- Convert ObjectIds to strings using .toString()
+- Use Set for O(1) lookup instead of array.some()
+
+BEFORE:
+const safeToRevert = failedReminderIds.filter(id => !sentReminderIds.some(s => s.equals(id)));
+
+AFTER:
+const sentIdStrings = new Set(sentReminderIds.map(id => id.toString()));
+const safeToRevert = failedReminderIds.filter(id => !sentIdStrings.has(id.toString()));
+
+IMPACT: Prevents double sending of reminders.
+
+================================================================================
+3. EXPEDITION REMINDERS LOST (reminder.scheduler.js)
+================================================================================
+
+ISSUE:
+- Multiple expedition cards for same user grouped by 'userId-type' only
+- Only first card's message sent
+- Other cards silently lost
+
+FIX:
+- Changed grouping key to include cardId: 'userId-type-cardId'
+- Each card gets sent independently
+
+BEFORE:
+const key = `${reminder.userId}-${reminder.type}`;
+
+AFTER:
+const key = `${reminder.userId}-${reminder.type}-${reminder.cardId || ''}`;
+
+IMPACT: No expedition reminders are lost.
+
+================================================================================
+4. STUCK CLAIMED REMINDERS (index.js + reminder.model.js)
+================================================================================
+
+ISSUE:
+- Startup recovery used remindAt (when reminder was due) instead of claimedAt (when it was claimed)
+- Recently claimed reminders could be immediately recovered and double-sent
+
+FIX:
+- Added claimedAt field to schema
+- Set claimedAt timestamp when claiming reminder
+- Recovery checks claimedAt instead of remindAt
+
+CHANGES:
+1. Added to schema: claimedAt: { type: Date }
+2. In getDueReminders(): { $set: { status: 'claimed', claimedAt: new Date() } }
+3. In startup recovery: createdAt changed to claimedAt
+
+BEFORE (index.js):
+{ status: 'claimed', remindAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } }
+
+AFTER (index.js):
+{ status: 'claimed', claimedAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } }
+
+IMPACT: No reminders are double-sent on bot restart.
+
+================================================================================
+5. EXPEDITION HAD NO DUPLICATE CHECK (expedition-reminder.system.js)
+================================================================================
+
+ISSUE:
+- No checkExistingReminder() call before creating
+- MessageUpdate could trigger creation repeatedly
+
+FIX:
+- Added duplicate check per cardId
+- Also improved grouping to send cards due at same time in one message
+
+BEFORE:
+for (const timeKey in timeGroups) {
+  const result = await createReminderSafe({...});
+  // No duplicate check
+}
+
+AFTER:
+for (const card of group.cards) {
+  const existing = await checkExistingReminder(userId, 'expedition', card.cardId);
+  if (existing) continue;
+  const result = await createReminderSafe({...});
+}
+
+IMPACT: Expedition reminders not spammed on embed edits.
+
+================================================================================
+6. STAMINA HAD NO DUPLICATE CHECK (stamina-reminder.system.js)
+================================================================================
+
+ISSUE:
+- Used Reminder.upsertReminder() directly without duplicate check
+- Confirmation message sent even if reminder already exists
+- Channel confirmation message duplicated
+
+FIX:
+- Added checkExistingReminder() before creation
+- Use createReminderSafe() instead of direct upsert
+- Only send confirmation on successful creation
+
+BEFORE:
+if (userId) {
+  try {
+    await Reminder.upsertReminder({...});
+    await message.channel.send("I'll remind you...");
+  } catch (error) {...}
+}
+
+AFTER:
+const existing = await checkExistingReminder(userId, 'stamina');
+if (existing) return;
+
+const result = await createReminderSafe({...});
+if (result.success) {
+  await message.channel.send("I'll remind you...");
+}
+
+IMPACT: No duplicate stamina reminders or confirmation spam.
+
+================================================================================
+7. MESSAGE-UPDATE EVENT HAD NO LUVIENABLED GATE (message-update.event.js)
+================================================================================
+
+ISSUE:
+- processRaidSpawnMessage, processExpeditionMessage fired even if luviEnabled was false
+- Unnecessary DB queries in disabled servers
+
+FIX:
+- Added luviEnabled check before processing
+- Added null-safe author check
+
+BEFORE:
+if (newMessage.author.id !== LUVI_BOT_ID) return;
+await processRaidSpawnMessage(newMessage);
+
+AFTER:
+if (newMessage.author?.id !== LUVI_BOT_ID) return;
+if (!newMessage.guild) return;
+
+const settings = await getSettings(newMessage.guildId);
+if (!settings?.luviEnabled) return;
+
+await processRaidSpawnMessage(newMessage);
+
+IMPACT: No wasted DB queries in disabled servers.
+
+================================================================================
+8. WEBHOOK LOGS SENT ONLY EVENT NAME (logger.js)
+================================================================================
+
+ISSUE:
+- Discord webhooks received just "REMINDER_CREATED" with no context
+- Impossible to debug from logs
+- Metadata was never sent to Discord
+
+FIX:
+- Created formatWebhookMessage() function
+- Sends formatted embed with all metadata fields
+- Added emoji indicators (🔴 for errors, 🟡 for warnings)
+
+BEFORE:
+if (logWebhook) {
+  await logWebhook.send(message);  // Just the string "REMINDER_CREATED"
+}
+
+AFTER:
+function formatWebhookMessage(message, metadata = {}) {
+  const lines = [`**${message}**`];
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value !== undefined && value !== null) {
+      lines.push(`\`${key}\`: ${value}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+if (logWebhook) {
+  await logWebhook.send({ content: formatWebhookMessage(message, metadata) });
+}
+
+IMPACT: Can now debug issues from Discord log channel.
+
+================================================================================
+9. SILENT FAILS IN DETECTION SYSTEMS (all reminder systems)
+================================================================================
+
+ISSUE:
+- Drop: userId extraction failure not logged
+- Raid spawn: userId null not logged
+- Expedition: Member fetch failures not logged
+- Stamina: Reference fetch failures not logged
+
+FIX:
+- Added sendWarn() logs when userId extraction fails
+- Logs include diagnostic info (e.g., hasInteractionMetadata flag)
+
+CHANGES:
+- drop-reminder.system.js: Logs DROP_USER_NOT_FOUND with iconUrl
+- raid-spawn-reminder.system.js: Logs RAID_SPAWN_USER_NOT_FOUND with metadata flags
+- expedition-reminder.system.js: Logs EXPEDITION_MEMBER_FETCH_FAILED with username
+- stamina-reminder.system.js: Logs STAMINA_USER_NOT_FOUND and STAMINA_REF_FETCH_FAILED
+
+EXAMPLE:
+if (!userId) {
+  await sendWarn('DROP_USER_NOT_FOUND', {
+    category: 'REMINDER',
+    guildId: message.guild.id,
+    channelId: message.channel.id,
+    iconUrl: iconUrl ?? 'none'
+  });
+  return;
+}
+
+IMPACT: Can immediately see why reminders fail to create.
+
+================================================================================
+10. EXPEDITION GROUPING IMPROVED (expedition-reminder.system.js)
+================================================================================
+
+ISSUE:
+- Multiple cards at different times grouped together
+- Lost cards if different times
+
+FIX:
+- Group by exact remindAt time (millisecond precision)
+- Send cards due at same time in one message
+- Each card tracked individually by cardId
+
+BEFORE:
+- 3 cards due at different times = 1 reminder for all (lost 2)
+
+AFTER:
+- Card A due 1h, Card B due 2h, Card C due 2h = 2 reminders (B+C together)
+- Each tracked individually so none are lost
+
+IMPACT: All expedition reminders fire correctly.
+
+================================================================================
+11. REMINDER TEST MODULE CREATED (reminder-test.js)
+================================================================================
+
+NEW FEATURE:
+- /rtest command for testing reminder pipeline
+- Select reminder type
+- Set custom duration
+- System detects simulated embed
+- Reminder created via detection system
+- Fires and sends at due time
+- Test entire pipeline: Detection → Creation → Sending
+
+USAGE:
+1. Type: rtest
+2. Select reminder type (expedition, stamina, raid, raidSpawn, drop)
+3. Enter duration in seconds (e.g., 10)
+4. System simulates Luvi embed
+5. Detection system creates reminder
+6. Reminder fires and sends after duration
+
+IMPACT: Can test full reminder pipeline end-to-end.
+
+================================================================================
+SUMMARY OF CHANGES
+================================================================================
+
+FILES MODIFIED:
+1. src/utils/reminder-duplicate.checker.js - Fixed duplicate check for 'claimed'
+2. src/tasks/reminder.scheduler.js - Fixed ObjectId comparison, added cardId grouping
+3. src/database/reminder.model.js - Added claimedAt field, updated getDueReminders
+4. index.js - Fixed stuck claimed recovery to use claimedAt
+5. src/systems/expedition-reminder.system.js - Added duplicate check, improved grouping
+6. src/systems/stamina-reminder.system.js - Added duplicate check, fixed confirmation
+7. src/events/message-update.event.js - Added luviEnabled gate, null-safe checks
+8. src/utils/logger.js - Fixed webhook message formatting
+9. src/systems/drop-reminder.system.js - Added logging for userId extraction failures
+10. src/systems/raid-spawn-reminder.system.js - Added logging for userId failures
+11. src/events/interaction-create.event.js - Added modal handler for reminder tests
+12. src/events/message-create.event.js - Added rtest command handler
+
+FILES CREATED:
+1. src/utils/reminder-test.js - Full reminder pipeline test module
+
+================================================================================
+TESTING RECOMMENDATIONS
+================================================================================
+
+1. TEST DUPLICATE CHECK FIX:
+   - Use /rtest to create expedition reminder
+   - Watch it get created and claimed
+   - Create another reminder while first is claimed
+   - Verify no second reminder created
+
+2. TEST OBJECTID FIX:
+   - Create reminder
+   - Simulate send failure
+   - Check scheduler doesn't revert sent ones
+
+3. TEST EXPEDITION GROUPING:
+   - Use /rtest expedition multiple times with different durations
+   - Verify cards due at same time grouped in one message
+
+4. TEST STUCK CLAIMED RECOVERY:
+   - Create reminder
+   - Claim it
+   - Restart bot immediately
+   - Verify not double-sent
+
+5. TEST DETECTION LOGGING:
+   - Use /rtest with each reminder type
+   - Check Discord logs for creation success
+   - Modify system to break detection
+   - Verify warning logs appear with diagnostic info
+
+6. TEST FULL PIPELINE:
+   - Use /rtest with 10 second duration
+   - Wait for reminder to fire
+   - Confirm message sent to user/channel
+
+================================================================================
+KNOWN LIMITATIONS
+================================================================================
+
+1. DROP REMINDER: Depends on footer avatar URL format from Luvi
+   - May break if Luvi changes embed format
+   - Now logs iconUrl for debugging
+
+2. RAID SPAWN REMINDER: Depends on message.interactionMetadata
+   - Discord.js v14 may not populate on all message types
+   - Fallback uses pendingSpawns for text commands only
+   - Now logs diagnostic flags for debugging
+
+3. EXPEDITION GROUPING: Groups only cards with exact same remindAt time
+   - Cards 1ms apart in different messages send separately
+
+================================================================================

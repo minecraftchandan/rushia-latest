@@ -59,7 +59,7 @@ module.exports = {
         color: COLORS.INFO,
         title: '📊 Current Role Settings',
         description,
-        footer: { text: 'Use /multi-roles to enable/disable multi-role system' }
+        footer: { text: 'Use /multi-roles or /set-boss-role to update settings' }
       };
 
       await interaction.reply({ embeds: [embed], flags: 1 << 6 });

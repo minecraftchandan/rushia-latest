@@ -21,7 +21,8 @@
     "dotenv": "^17.2.0",
     "mongoose": "^8.16.2",
     "node-cache": "^5.1.2",
-    "pm2": "^6.0.8"
+    "pm2": "^6.0.8",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

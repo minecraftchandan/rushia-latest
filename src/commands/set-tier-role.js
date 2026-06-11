@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const { getSettings, updateSettings } = require('../utils/settings.manager');
+const { refreshGuildCache } = require('../utils/cache-refresh');
 const { BOT_OWNER_ID } = require('../config/constants');
 
 module.exports = {
@@ -39,6 +40,9 @@ module.exports = {
       };
 
       await updateSettings(interaction.guild.id, newSettings);
+      
+      // Refresh cache after updating settings
+      await refreshGuildCache(interaction.guild.id);
 
       if (role) {
         await interaction.reply({ content: `✅ Role ${role} set for all boss spawns successfully!`, flags: 1 << 6 });

@@ -3,6 +3,15 @@ const { getUserSettings } = require('../utils/user-settings.manager');
 const { sendLog, sendError } = require('../utils/logger');
 const { SCHEDULER } = require('../config/constants');
 
+let schedulerTimeout = null;
+
+function stopScheduler() {
+  if (schedulerTimeout) {
+    clearTimeout(schedulerTimeout);
+    schedulerTimeout = null;
+  }
+}
+
 async function checkReminders(client) {
   try {
     const dueReminders = await Reminder.getDueReminders(2000, SCHEDULER.BATCH_SIZE);
@@ -172,10 +181,16 @@ async function checkReminders(client) {
 }
 
 function startScheduler(client) {
+  stopScheduler();
+  
   (function schedule() {
-    checkReminders(client).finally(() => setTimeout(schedule, SCHEDULER.CHECK_INTERVAL));
+    schedulerTimeout = setTimeout(() => {
+      checkReminders(client)
+        .catch(error => sendError('SCHEDULER_ERROR', { category: 'SYSTEM', action: 'SCHEDULER_ERROR', error: error.message }));
+      schedule();
+    }, SCHEDULER.CHECK_INTERVAL);
   })();
   sendLog('[SCHEDULER] Reminder scheduler started.', { category: 'SYSTEM' });
 }
 
-module.exports = { startScheduler };
+module.exports = { startScheduler, stopScheduler };

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const BotSettings = require('../database/bot-settings.model');
+const { refreshGuildCache } = require('../utils/cache-refresh');
 const { BOT_OWNER_ID } = require('../config/constants');
 
 module.exports = {
@@ -57,6 +58,9 @@ module.exports = {
       settings.multiRoleEnabled = true;
       await settings.save();
       
+      // Refresh cache after updating settings
+      await refreshGuildCache(guildId);
+      
       return interaction.reply({
         content: '✅ Multi-role system enabled! Use `/multi-roles set-boss` to configure roles for each tier.',
         ephemeral: true
@@ -66,6 +70,9 @@ module.exports = {
     if (subcommand === 'disable') {
       settings.multiRoleEnabled = false;
       await settings.save();
+      
+      // Refresh cache after updating settings
+      await refreshGuildCache(guildId);
       
       return interaction.reply({
         content: '✅ Multi-role system disabled! Bot will use single role set via `/set-boss-role`.',
@@ -87,6 +94,9 @@ module.exports = {
       const fieldName = `${tier}RoleId`;
       settings[fieldName] = role ? role.id : null;
       await settings.save();
+
+      // Refresh cache after updating settings
+      await refreshGuildCache(guildId);
 
       if (role) {
         return interaction.reply({
