@@ -13,10 +13,9 @@ const {
 const fs = require('fs');
 const path = require('path');
 const { startScheduler } = require('./src/tasks/reminder.scheduler');
-const { initializeSettingsCache } = require('./src/tasks/cache-refresh.scheduler');
 const { initializeSettings } = require('./src/utils/settings.manager');
 const DatabaseManager = require('./src/database/database.manager');
-const { sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
+const { logInfo, logError, logCritical, initializeLogsDB } = require('./src/utils/logger');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
 
 const client = new Client({
@@ -28,10 +27,8 @@ const client = new Client({
   ],
 });
 
-// Increase max listeners to prevent memory leak warnings
 client.setMaxListeners(25);
 
-// Load commands from ./commands folder
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'src', 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -43,7 +40,6 @@ for (const file of commandFiles) {
   }
 }
 
-// Load event handlers from ./events folder
 const eventsPath = path.join(__dirname, 'src', 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
@@ -60,32 +56,27 @@ for (const file of eventFiles) {
     }
 }
 
-// Load event handlers from ./events folder
 const { handleGeneratorReaction } = require('./src/systems/message-generator.system');
 
-// Track scheduler state
 let reminderSchedulerStarted = false;
 
-// Handle bot disconnect to stop scheduler
 client.on(Events.ShardDisconnect, async () => {
   if (reminderSchedulerStarted) {
     const { stopScheduler } = require('./src/tasks/reminder.scheduler');
     stopScheduler();
     reminderSchedulerStarted = false;
-    await sendLog('SCHEDULER_STOPPED', { category: 'SYSTEM', reason: 'SHARD_DISCONNECT' }).catch(() => {});
+    await logInfo('SCHEDULER_STOPPED', { category: 'SYSTEM', metadata: { reason: 'SHARD_DISCONNECT' } }).catch(() => {});
   }
 });
 
 client.on(Events.Error, (error) => {
-  sendError(`[CLIENT ERROR] ${error.stack || error.message}`).catch(() => {});
+  logError('[CLIENT ERROR]', error, { category: 'SYSTEM' }).catch(() => {});
 });
 
-// Handle reactions for generator system and card rarity system
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   await handleGeneratorReaction(reaction, user);
 });
 
-// Guild join welcome/setup guide
 client.on(Events.GuildCreate, async (guild) => {
   try {
     const defaultChannel = guild.channels.cache
@@ -96,20 +87,19 @@ client.on(Events.GuildCreate, async (guild) => {
       .first();
 
     if (!defaultChannel) {
-      await sendLog(`No accessible text channel found in guild ${guild.name}`, { guildId: guild.id });
+      await logInfo('No accessible text channel', { guildId: guild.id });
       return;
     }
 
     const guideMessage = "**Hello! Thanks for adding Rushia!**\n-# use `rconfig` to enable luvi helper";
 
     await defaultChannel.send(guideMessage);
-    await sendLog(`Sent setup guide message in guild ${guild.name}`, { guildId: guild.id });
+    await logInfo('Setup guide sent', { guildId: guild.id, metadata: { guildName: guild.name } });
   } catch (error) {
-    await sendError(`Failed to send setup message in guild ${guild.name}: ${error.message}`, { guildId: guild.id });
+    await logError('Setup message failed', error, { guildId: guild.id });
   }
 });
 
-// Deploy slash commands function
 async function deployCommands(client) {
   console.log('🔄 Starting command deployment...');
   const commands = [];
@@ -136,19 +126,17 @@ async function deployCommands(client) {
       { body: commands }
     );
     console.log(`✅ Successfully deployed ${data.length} slash commands!`);
-    await sendLog('COMMANDS_DEPLOYED', {
+    await logInfo('COMMANDS_DEPLOYED', {
       category: 'SYSTEM',
-      action: 'COMMANDS_DEPLOYED',
-      count: data.length
+      metadata: { count: data.length }
     });
   } catch (error) {
     console.error('❌ Failed to deploy commands:', error);
-    await sendError(`Failed to deploy commands: ${error.message}`);
+    await logError('Command deployment failed', error, { category: 'SYSTEM' });
     throw error;
   }
 }
 
-// Connect to MongoDB and login the bot
 (async () => {
   try {
     console.log('🚀 Starting bot initialization...');
@@ -165,22 +153,18 @@ async function deployCommands(client) {
     await initializeLogsDB();
     console.log('✅ Logs database initialized');
     
-    // Auto-deploy commands on startup
     await deployCommands(client);
     
-    // Schedule daily cleanup
     setInterval(() => {
       DatabaseManager.cleanup().catch(console.error);
-    }, 24 * 60 * 60 * 1000); // Daily
+    }, 24 * 60 * 60 * 1000);
 
   client.once(Events.ClientReady, async readyClient => {
         console.log(`✅ Bot logged in as ${readyClient.user.tag}`);
         
-        await sendLog('BOT_READY', { 
+        await logInfo('BOT_READY', { 
           category: 'SYSTEM',
-          action: 'BOT_READY',
-          botTag: readyClient.user.tag,
-          botId: readyClient.user.id
+          metadata: { botTag: readyClient.user.tag, botId: readyClient.user.id }
         });
         
         console.log('📂 Initializing settings cache...');
@@ -189,21 +173,20 @@ async function deployCommands(client) {
         
         console.log('⏰ Starting reminder scheduler...');
         const Reminder = require('./src/database/reminder.model');
-        // Delete reminders that were due more than 5 minutes ago (bot was down too long)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
         const stale = await Reminder.deleteMany({
           status: 'pending',
           remindAt: { $lt: fiveMinutesAgo }
         });
         if (stale.deletedCount > 0) {
-          await sendLog(`[STARTUP] Deleted ${stale.deletedCount} stale reminders`, { category: 'SYSTEM' });
+          await logInfo('[STARTUP] Stale reminders deleted', { category: 'SYSTEM', metadata: { count: stale.deletedCount } });
         }
         const stuckCount = await Reminder.updateMany(
-          { status: 'claimed', remindAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
-          { $set: { status: 'pending' } }
+          { status: 'claimed', claimedAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
+          { $set: { status: 'pending', claimedAt: null } }
         );
         if (stuckCount.modifiedCount > 0) {
-          await sendLog(`[STARTUP] Recovered ${stuckCount.modifiedCount} stuck claimed reminders`, { category: 'SYSTEM' });
+          await logInfo('[STARTUP] Stuck reminders recovered', { category: 'SYSTEM', metadata: { count: stuckCount.modifiedCount } });
         }
         if (!reminderSchedulerStarted) {
           startScheduler(readyClient);
@@ -246,20 +229,19 @@ async function deployCommands(client) {
     await client.login(process.env.BOT_TOKEN);
   } catch (error) {
     console.error('❌ Fatal error during bot startup:', error);
-    await sendError(`Failed to start bot: ${error.message}`);
+    await logCritical('Bot startup failed', error, { category: 'SYSTEM' });
     process.exit(1);
   }
 })();
 
-// Global error handlers to prevent crashes
 process.on('unhandledRejection', (error) => {
-  sendError(`[UNHANDLED REJECTION] ${error.stack || error.message}`).catch(() => {});
+  logError('[UNHANDLED REJECTION]', error, { category: 'SYSTEM' }).catch(() => {});
 });
 
 process.on('uncaughtException', (error) => {
-  sendError(`[UNCAUGHT EXCEPTION] ${error.stack || error.message}`).catch(() => {});
+  logError('[UNCAUGHT EXCEPTION]', error, { category: 'SYSTEM' }).catch(() => {});
 });
 
 client.on('error', (error) => {
-  sendError(`[CLIENT ERROR] ${error.stack || error.message}`).catch(() => {});
+  logError('[CLIENT ERROR]', error, { category: 'SYSTEM' }).catch(() => {});
 });
