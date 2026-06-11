@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { logError } = require('../utils/logger');
 
 class DatabaseManager {
   static async connect() {
@@ -18,8 +19,7 @@ class DatabaseManager {
         autoIndex: false
       });
     } catch (error) {
-      const { sendError } = require('../utils/logger');
-      await sendError(`MongoDB connection failed: ${error.message}`);
+      await logError('MongoDB connection failed', error);
       throw error;
     }
   }
@@ -44,19 +44,16 @@ class DatabaseManager {
         UsernameCache.createIndexes()
       ]);
       
-      // Initialize POG models separately (they use their own connection)
       try {
         const PogGuild = require('./pog-guild.model');
         const Series = require('./series.model');
         await PogGuild.syncIndexes();
         await Series.syncIndexes();
       } catch (pogError) {
-        const { sendError } = require('../utils/logger');
-        await sendError(`POG database indexes failed: ${pogError.message}`);
+        await logError('POG database indexes failed', pogError);
       }
     } catch (error) {
-      const { sendError } = require('../utils/logger');
-      await sendError(`Failed to create indexes: ${error.message}`);
+      await logError('Failed to create indexes', error);
     }
   }
 
@@ -70,8 +67,7 @@ class DatabaseManager {
         status: 'pending'
       });
     } catch (error) {
-      const { sendError } = require('../utils/logger');
-      await sendError(`Cleanup failed: ${error.message}`);
+      await logError('Cleanup failed', error);
     }
   }
 
@@ -102,15 +98,13 @@ class DatabaseManager {
     try {
       await mongoose.disconnect();
     } catch (error) {
-      const { sendError } = require('../utils/logger');
-      await sendError(`Disconnect failed: ${error.message}`);
+      await logError('Disconnect failed', error);
     }
   }
 }
 
 mongoose.connection.on('error', (err) => {
-  const { sendError } = require('../utils/logger');
-  sendError(`MongoDB connection error: ${err.message}`).catch(() => {});
+  logError('MongoDB connection error', err).catch(() => {});
 });
 
 process.on('SIGINT', async () => {
