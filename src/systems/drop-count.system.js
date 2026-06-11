@@ -1,6 +1,6 @@
 const Drops = require('../database/drops.model');
 const { parseCardEmbed } = require('../utils/embed.parser');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 
 const LUVI_ID = '1269481871021047891';
 
@@ -33,9 +33,7 @@ async function processDropCount(message) {
       { upsert: true, new: true }
     );
 
-    sendLog(`[DROP] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (Total: ${result.drop_count})`);
-    
-    await sendLog(`[DROP COUNT] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (Total: ${result.drop_count})`, {
+    await logInfo(`[DROP] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (Total: ${result.drop_count})`, {
       category: 'DROP_COUNT',
       userId,
       guildId: message.guild.id,
@@ -44,12 +42,10 @@ async function processDropCount(message) {
       drop_count: result.drop_count
     });
   } catch (error) {
-    sendError('[DROP ERROR]', error.message);
-    await sendError(`[DROP COUNT] Failed to update: ${error.message}`, {
+    await logError(`[DROP ERROR] Failed to update: ${error.message}`, error, {
       category: 'DROP_COUNT',
       userId,
-      guildId: message.guild.id,
-      error: error.stack
+      guildId: message.guild.id
     });
   }
 }

@@ -40,28 +40,28 @@ async function processSeriesMessage(message) {
   try {
     const TARGET_BOT_ID = SOFI_BOT_ID;
     
-    sendLog(`[SERIES] Message from: ${message.author.id} (${message.author.username})`);
+    await logInfo('[SERIES] Message from: ${message.author.id} (${message.author.username})', { operation: 'SERIES_PROCESS' });
     
     if (message.author.id !== TARGET_BOT_ID) return;
     if (!message.embeds?.length) {
-      sendLog('[SERIES] No embeds found');
+      await logInfo('[SERIES] No embeds found', { operation: 'SERIES_PROCESS' });
       return;
     }
 
     const embed = message.embeds[0];
-    sendLog(`[SERIES] Embed description: ${embed.description?.substring(0, 100)}...`);
+    await logInfo(`[SERIES] Embed description: ${embed.description?.substring(0, 100)}...`, { operation: 'SERIES_PROCESS' });
     
     // Check for SOFI series selection format
     const hasChooseDesc = embed.description?.includes('Choose a series to drop characters from:');
     
     if (!hasChooseDesc) {
-      sendLog('[SERIES] Not a series selection embed');
+      await logInfo('[SERIES] Not a series selection embed', { operation: 'SERIES_PROCESS' });
       return;
     }
     if (!embed.description) return;
 
     const lines = embed.description.split('\n');
-    sendLog(`[SERIES] Total lines: ${lines.length}`);
+    await logInfo(`[SERIES] Total lines: ${lines.length}`, { operation: 'SERIES_PROCESS' });
     
     // For SOFI format: `1` • Series Name
     const seriesLines = lines.filter(line => {
@@ -69,53 +69,54 @@ async function processSeriesMessage(message) {
       return /^`\d+`\s*•/.test(trimmed);
     });
 
-    sendLog(`[SERIES] Found ${seriesLines.length} series lines`);
+    await logInfo(`[SERIES] Found ${seriesLines.length} series lines`, { operation: 'SERIES_PROCESS' });
     if (seriesLines.length === 0) return;
 
     // Fetch all series once (cached) and build in-memory list
     const allSeries = await getAllSeries();
-    sendLog(`[SERIES] Database has ${allSeries.length} series`);
+    await logInfo(`[SERIES] Database has ${allSeries.length} series`, { operation: 'SERIES_PROCESS' });
 
     let replyText = '';
     for (let i = 0; i < seriesLines.length; i++) {
       const line = seriesLines[i];
-      sendLog(`[SERIES] Parsing line: ${line}`);
+      await logInfo(`[SERIES] Parsing line: ${line}`, { operation: 'SERIES_PROCESS' });
       
       // Extract number and series name from format: `1` • Series Name
       const match = line.match(/^`(\d+)`\s*•\s*(.+)$/);
       if (!match) {
-        sendLog(`[SERIES] Failed to match line: ${line}`);
+        await logInfo(`[SERIES] Failed to match line: ${line}`, { operation: 'SERIES_PROCESS' });
         continue;
       }
       
       const originalNumber = match[1];
       const seriesName = match[2].trim();
-      sendLog(`[SERIES] Extracted: ${originalNumber} - ${seriesName}`);
+      await logInfo(`[SERIES] Extracted: ${originalNumber} - ${seriesName}`, { operation: 'SERIES_PROCESS' });
       
       // Match series in database
       const seriesMatch = matchSeriesInList(seriesName, allSeries);
       const hearts = seriesMatch ? seriesMatch.hearts : '??';
-      sendLog(`[SERIES] Hearts for "${seriesName}": ${hearts}`);
+      await logInfo(`[SERIES] Hearts for "${seriesName}": ${hearts}`, { operation: 'SERIES_PROCESS' });
       
       replyText += `\`${originalNumber}\`] • :heart: \`${hearts.padStart(3, ' ')}\` • ${seriesName}\n`;
     }
 
     if (replyText) {
-      sendLog(`[SERIES] Sending reply with ${seriesLines.length} series`);
+      await logInfo(`[SERIES] Sending reply with ${seriesLines.length} series`, { operation: 'SERIES_PROCESS' });
       try {
         await message.reply(replyText.trim() + '\n-# Can be inaccurate, report using </suggestion:1446456675954593864>');
-        sendLog('[SERIES] Reply sent successfully');
+        await logInfo('[SERIES] Reply sent successfully', { operation: 'SERIES_PROCESS', action: 'SENT' });
       } catch (err) {
-        sendError(`[SERIES] Failed to send reply: ${err.message}`);
-        await sendError(`[seriesSystem] Failed to reply in channel ${message.channel.id}: ${err.message}`, {
+        await logError(`[SERIES] Failed to send reply: ${err.message}`, err, {
+          operation: 'SERIES_PROCESS',
+          action: 'FAILED',
           guildId: message.guildId,
           channelId: message.channelId
         });
       }
     }
   } catch (error) {
-    sendError(`[SERIES] Error: ${error.message}`, error);
-    await sendError(`Series processing error: ${error.message}`, { 
+    await logError(`[SERIES] Error: ${error.message}`, error, { 
+      operation: 'SERIES_PROCESS',
       guildId: message.guildId,
       channelId: message.channelId 
     });

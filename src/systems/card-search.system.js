@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { sendLog, sendError } = require('../utils/logger');
+const { logInfo, logError } = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,7 +9,7 @@ let cards = [];
 try {
   cards = JSON.parse(fs.readFileSync(cardsPath, 'utf8'));
 } catch (error) {
-  sendError('Failed to load cards.json:', error);
+  logError('Failed to load cards.json:', error);
 }
 
 // Store search results for user selection

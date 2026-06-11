@@ -1,5 +1,5 @@
 const ClashCount = require('../database/clash-count.model');
-const { sendError } = require('../utils/logger');
+const { logError } = require('../utils/logger');
 
 const LUVI_ID = '1269481871021047891';
 
@@ -22,7 +22,7 @@ async function processClashMessage(message) {
       { upsert: true }
     );
   } catch (error) {
-    sendError('Clash count error:', error.message);
+    logError('Clash count error:', error);
   }
 }
 
