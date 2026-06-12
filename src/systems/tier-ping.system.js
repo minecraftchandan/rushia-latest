@@ -58,7 +58,7 @@ async function processBossMessage(message) {
     try {
       const role = message.guild.roles.cache.get(roleId);
       if (!role) {
-        await logError('Role not found', error, { guildId: message.guild.id, roleId, category: 'BOSS' });
+        await logError('Role not found', new Error('Role not found'), { guildId: message.guild.id, guildName: message.guild.name, roleId, category: 'BOSS' });
         return;
       }
 
@@ -68,7 +68,7 @@ async function processBossMessage(message) {
       const roleIsMentionable = role.mentionable;
 
       if (!hasMentionPerm && !botAboveRole && !roleIsMentionable) {
-        await logError('Missing permissions to ping role', error, { guildId: message.guild.id, channelId: message.channel.id, roleId, category: 'BOSS' });
+        await logError('Missing permissions to ping role', new Error('Missing permissions'), { guildId: message.guild.id, guildName: message.guild.name, channelId: message.channel.id, roleId, category: 'BOSS' });
         return;
       }
 
@@ -82,7 +82,7 @@ async function processBossMessage(message) {
         setTimeout(async () => {
           message.channel.send({ content, allowedMentions: { roles: [roleId] } })
             .catch(async err => {
-              await logError('Failed to send delayed boss ping', err, { category: 'BOSS' });
+              await logError('Failed to send delayed boss ping', err, { category: 'BOSS', guildId: message.guild.id, guildName: message.guild.name });
             });
         }, delayMs);
         await logInfo('Boss ping sent (delayed)', { category: 'BOSS', metadata: { bossName: bossInfo.bossName, tier: bossInfo.tier, delay: delayMs, guildName: message.guild.name } });
@@ -92,7 +92,7 @@ async function processBossMessage(message) {
         await logInfo('Boss ping sent', { category: 'BOSS', metadata: { bossName: bossInfo.bossName, tier: bossInfo.tier, guildName: message.guild.name } });
       }
     } catch (err) {
-      await logError('Failed to send boss ping', err, { category: 'BOSS' });
+      await logError('Failed to send boss ping', err, { category: 'BOSS', guildId: message.guild.id, guildName: message.guild.name });
     }
   }
 }

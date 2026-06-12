@@ -3,7 +3,7 @@ const Reminder = require('../database/reminder.model');
 const { logInfo, logError } = require('../utils/logger');
 const { createReminderSafe, checkExistingReminder } = require('../utils/reminder-duplicate.checker');
 
-async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
+async function createRaidReminder(userId, guildId, guildName, channelId, fatigueMillis) {
   const remindAt = new Date(Date.now() + fatigueMillis);
   const result = await createReminderSafe({
     userId,
@@ -30,6 +30,8 @@ async function createRaidReminder(userId, guildId, channelId, fatigueMillis) {
       action: 'CREATE_FAILED',
       type: 'raid',
       userId,
+      guildId,
+      guildName,
       error: result.error.message
     });
   }
@@ -53,7 +55,7 @@ async function processRaidMessage(message) {
   for (const { userId, fatigueMillis } of raidInfo) {
     const existing = await checkExistingReminder(userId, 'raid');
     if (existing) continue;
-    await createRaidReminder(userId, message.guild.id, message.channel.id, fatigueMillis);
+    await createRaidReminder(userId, message.guild.id, message.guild.name, message.channel.id, fatigueMillis);
   }
 
   return true;

@@ -52,6 +52,8 @@ async function processStaminaMessage(message) {
         action: 'CREATE_FAILED',
         type: 'stamina',
         userId,
+        guildId: message.guild.id,
+        guildName: message.guild.name,
         error: error.message
       });
     }

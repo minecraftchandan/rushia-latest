@@ -76,6 +76,8 @@ async function detectAndSetRaidSpawnReminder(message) {
       action: 'CREATE_FAILED',
       type: 'raidSpawn',
       userId,
+      guildId: message.guild.id,
+      guildName: message.guild.name,
       error: result.error.message
     });
   }

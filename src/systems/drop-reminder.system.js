@@ -52,6 +52,8 @@ async function detectAndSetDropReminder(message) {
       action: 'CREATE_FAILED',
       type: 'drop',
       userId,
+      guildId: message.guild.id,
+      guildName: message.guild.name,
       error: result.error.message
     });
   }

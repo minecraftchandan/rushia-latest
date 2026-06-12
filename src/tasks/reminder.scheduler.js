@@ -110,6 +110,7 @@ async function checkReminders(client) {
               } else {
                 const channel = await client.channels.fetch(reminderData.channelId);
                 if (channel) {
+                  const guild = channel.guild;
                   await channel.send(reminderData.reminderMessage);
                   sendSuccess = true;
                   await sendLog('REMINDER_SENT', { 
@@ -118,21 +119,25 @@ async function checkReminders(client) {
                     type: reminderData.type,
                     userId: reminderData.userId,
                     guildId: reminderData.guildId,
+                    guildName: guild?.name,
                     channelId: reminderData.channelId,
                     method: 'CHANNEL'
                   });
                 }
               }
             } catch (innerError) {
+              const guild = reminderData.guildId ? await client.guilds.fetch(reminderData.guildId).catch(() => null) : null;
               await sendError('REMINDER_SEND_FAILED', {
                 category: 'REMINDER',
                 action: 'SEND_FAILED',
                 type: reminderData.type,
                 userId: reminderData.userId,
                 guildId: reminderData.guildId,
+                guildName: guild?.name,
                 channelId: reminderData.channelId,
                 method: sendInDm ? 'DM' : 'CHANNEL',
-                error: innerError.message
+                error: innerError.message,
+                errorCode: innerError.code
               });
               sendSuccess = false;
             }
@@ -150,11 +155,14 @@ async function checkReminders(client) {
             await sendLog(`[REMINDER] Deleted ${reminderData.reminderIds.length} disabled ${reminderData.type} reminders`, { category: 'REMINDER' });
           }
         } catch (error) {
+          const guild = reminderData.guildId ? await client.guilds.fetch(reminderData.guildId).catch(() => null) : null;
           await sendError('REMINDER_SEND_FAILED', { 
             category: 'REMINDER',
             action: 'SEND_FAILED',
             type: reminderData.type,
             userId: reminderData.userId,
+            guildId: reminderData.guildId,
+            guildName: guild?.name,
             error: error.message
           });
         }

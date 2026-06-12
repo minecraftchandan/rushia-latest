@@ -104,6 +104,8 @@ async function processExpeditionMessage(message) {
         action: 'CREATE_FAILED',
         type: 'expedition',
         userId,
+        guildId: message.guild.id,
+        guildName: message.guild.name,
         error: result.error.message
       });
     }
