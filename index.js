@@ -15,7 +15,7 @@ const path = require('path');
 const { startScheduler } = require('./src/tasks/reminder.scheduler');
 const { initializeSettings } = require('./src/utils/settings.manager');
 const DatabaseManager = require('./src/database/database.manager');
-const { logInfo, logError, logCritical, initializeLogsDB } = require('./src/utils/logger');
+const { logInfo, logError, logCritical, sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
 
 const client = new Client({
@@ -183,7 +183,7 @@ async function deployCommands(client) {
         }
         const stuckCount = await Reminder.updateMany(
           { status: 'claimed', claimedAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } },
-          { $set: { status: 'pending', claimedAt: null } }
+          { $set: { status: 'pending', claimedAt: null, updatedAt: new Date() } }
         );
         if (stuckCount.modifiedCount > 0) {
           await logInfo('[STARTUP] Stuck reminders recovered', { category: 'SYSTEM', metadata: { count: stuckCount.modifiedCount } });

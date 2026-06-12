@@ -10,7 +10,9 @@ const reminderSchema = new mongoose.Schema({
   cardId: { type: String },
   status: { type: String, enum: ['pending', 'claimed', 'sent'], default: 'pending' },
   sentAt: { type: Date },
-  createdAt: { type: Date, default: Date.now }
+  claimedAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 }, {
   timestamps: false,
   collection: 'reminders'
@@ -86,7 +88,7 @@ reminderSchema.statics.getDueReminders = async function(windowMs = 2000, limit =
   for (const reminder of candidates) {
     const claimed = await this.findOneAndUpdate(
       { _id: reminder._id, status: 'pending' },
-      { $set: { status: 'claimed' } },
+      { $set: { status: 'claimed', claimedAt: new Date(), updatedAt: new Date() } },
       { new: false }
     );
     if (claimed) results.push(reminder);
@@ -107,7 +109,7 @@ reminderSchema.statics.markAsSent = async function(reminderIds) {
 reminderSchema.statics.revertClaimed = async function(reminderIds) {
   return await this.updateMany(
     { _id: { $in: reminderIds }, status: 'claimed' },
-    { $set: { status: 'pending', sentAt: null } }
+    { $set: { status: 'pending', sentAt: null, claimedAt: null, updatedAt: new Date() } }
   );
 };
 

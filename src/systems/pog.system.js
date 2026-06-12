@@ -1,6 +1,6 @@
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const PogGuild = require('../database/pog-guild.model');
-const { logInfo, logError } = require('../utils/logger');
+const { logInfo, logError, sendLog, sendError } = require('../utils/logger');
 
 // Parse both plain numbers and compact notation (e.g. '1.1k', '1234')
 function parseFlexibleNumber(str) {

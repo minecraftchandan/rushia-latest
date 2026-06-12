@@ -140,14 +140,14 @@ async function checkReminders(client) {
             if (sendSuccess) {
               await Reminder.markAsSent(reminderData.reminderIds);
               sentReminderIds.push(...reminderData.reminderIds);
-              sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} reminders as sent`);
+              await sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} reminders as sent`, { category: 'REMINDER' });
             } else {
               failedReminderIds.push(...reminderData.reminderIds);
-              sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} ${reminderData.type} reminders for retry`);
+              await sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} ${reminderData.type} reminders for retry`, { category: 'REMINDER' });
             }
           } else {
             await Reminder.deleteMany({ _id: { $in: reminderData.reminderIds } });
-            sendLog(`[REMINDER] Deleted ${reminderData.reminderIds.length} disabled ${reminderData.type} reminders`);
+            await sendLog(`[REMINDER] Deleted ${reminderData.reminderIds.length} disabled ${reminderData.type} reminders`, { category: 'REMINDER' });
           }
         } catch (error) {
           await sendError('REMINDER_SEND_FAILED', { 
@@ -167,7 +167,7 @@ async function checkReminders(client) {
       const safeToRevert = failedReminderIds.filter(id => !sentReminderIds.some(s => s.equals(id)));
       if (safeToRevert.length > 0) {
         await Reminder.revertClaimed(safeToRevert);
-        sendLog(`[REMINDER] Reverted ${safeToRevert.length} failed reminders for retry`);
+        await sendLog(`[REMINDER] Reverted ${safeToRevert.length} failed reminders for retry`, { category: 'REMINDER' });
       }
     }
 

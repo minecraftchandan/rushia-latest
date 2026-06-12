@@ -10,7 +10,7 @@ const MAX_PENDING_LOGS = 1000;
 // Log Schema with comprehensive fields
 const logSchema = new mongoose.Schema({
   // Unique identifier for tracing
-  correlationId: { type: String, required: true },
+  correlationId: { type: String, required: true, index: true },
   
   // Log level
   level: { 
@@ -27,7 +27,7 @@ const logSchema = new mongoose.Schema({
   stackTrace: { type: String },
   
   // Timing
-  timestamp: { type: Date, default: Date.now },
+  timestamp: { type: Date, default: Date.now, index: true },
   executionTimeMs: { type: Number }, // milliseconds taken to complete operation
   
   // Context identifiers
@@ -60,11 +60,11 @@ const logSchema = new mongoose.Schema({
 });
 
 // Indexes for common queries
-logSchema.index({ correlationId: 1 }); // trace entire operation flow
 logSchema.index({ timestamp: 1, level: 1 });
 logSchema.index({ guildId: 1, timestamp: -1 });
 logSchema.index({ userId: 1, timestamp: -1 });
 logSchema.index({ operation: 1, action: 1, timestamp: -1 });
+logSchema.index({ correlationId: 1 }); // trace entire operation flow
 
 // TTL index to expire logs after 30 days
 logSchema.index({ timestamp: 1 }, { expireAfterSeconds: 2592000 });
@@ -113,7 +113,6 @@ async function flushPendingLogs() {
   const docs = pendingLogs.splice(0, pendingLogs.length);
   try {
     await Log.insertMany(docs, { ordered: false });
-    console.log(`✅ Flushed ${docs.length} pending logs to database`);
   } catch (error) {
     console.error('❌ Error flushing pending logs:', error.message);
     // Re-add failed docs back to pending (only first 100 to prevent overflow)
@@ -124,7 +123,7 @@ async function flushPendingLogs() {
 function createLogDocument(logEntry) {
   return {
     correlationId: logEntry.correlationId || uuidv4(),
-    level: logEntry.level,
+    level: logEntry.level || 'INFO',
     message: logEntry.message,
     stackTrace: logEntry.stackTrace,
     timestamp: new Date(),
@@ -168,7 +167,72 @@ async function saveLogToDB(logEntry) {
   }
 }
 
-// Main logging functions
+// OLD LOGGING FUNCTIONS (for backward compatibility with existing code)
+async function sendLog(message, metadata = {}) {
+  const entry = {
+    level: 'INFO',
+    message: typeof message === 'string' ? message : JSON.stringify(message),
+    metadata: metadata || {},
+    operation: metadata.category || 'LOG',
+    action: metadata.action || 'INFO',
+    guildId: metadata.guildId,
+    userId: metadata.userId,
+    channelId: metadata.channelId,
+  };
+  await saveLogToDB(entry);
+  console.log(message);
+}
+
+async function sendError(message, metadata = {}) {
+  const entry = {
+    level: 'ERROR',
+    message: typeof message === 'string' ? message : JSON.stringify(message),
+    errorMessage: metadata.error || (metadata instanceof Error ? metadata.message : null),
+    stackTrace: metadata instanceof Error ? metadata.stack : null,
+    metadata: metadata || {},
+    operation: metadata.category || 'ERROR',
+    action: metadata.action || 'ERROR',
+    guildId: metadata.guildId,
+    userId: metadata.userId,
+    channelId: metadata.channelId,
+  };
+  await saveLogToDB(entry);
+  console.error(message);
+}
+
+async function sendWarn(message, metadata = {}) {
+  const entry = {
+    level: 'WARN',
+    message: typeof message === 'string' ? message : JSON.stringify(message),
+    metadata: metadata || {},
+    operation: metadata.category || 'WARN',
+    action: metadata.action || 'WARN',
+    guildId: metadata.guildId,
+    userId: metadata.userId,
+    channelId: metadata.channelId,
+  };
+  await saveLogToDB(entry);
+  console.warn(message);
+}
+
+async function sendDebug(message, metadata = {}) {
+  if (process.env.DEBUG !== 'true') return;
+  
+  const entry = {
+    level: 'DEBUG',
+    message: typeof message === 'string' ? message : JSON.stringify(message),
+    metadata: metadata || {},
+    operation: metadata.category || 'DEBUG',
+    action: metadata.action || 'DEBUG',
+    guildId: metadata.guildId,
+    userId: metadata.userId,
+    channelId: metadata.channelId,
+  };
+  await saveLogToDB(entry);
+  console.log(message);
+}
+
+// NEW LOGGING FUNCTIONS (comprehensive)
 async function logInfo(message, options = {}) {
   const entry = {
     level: 'INFO',
@@ -224,87 +288,21 @@ async function logDebug(message, options = {}) {
   await saveLogToDB(entry);
 }
 
-// Convenience functions for common operations
-async function logReminderCreated(userId, type, remindAt, options = {}) {
-  await logInfo('Reminder created', {
-    operation: 'REMINDER_CREATE',
-    action: 'CREATED',
-    userId,
-    metadata: { type, remindAt: remindAt.toISOString() },
-    tags: ['reminder', 'scheduled'],
-    ...options,
-  });
-}
-
-async function logReminderSent(userId, type, method, options = {}) {
-  await logInfo('Reminder sent', {
-    operation: 'REMINDER_SEND',
-    action: 'SENT',
-    userId,
-    metadata: { type, method },
-    tags: ['reminder', 'sent'],
-    ...options,
-  });
-}
-
-async function logReminderFailed(userId, type, error, options = {}) {
-  await logError('Reminder send failed', error, {
-    operation: 'REMINDER_SEND',
-    action: 'FAILED',
-    userId,
-    metadata: { type },
-    tags: ['reminder', 'failed', 'retry'],
-    ...options,
-  });
-}
-
-async function logCommandExecuted(commandName, userId, guildId, executionTimeMs, options = {}) {
-  await logInfo(`Command executed: ${commandName}`, {
-    operation: 'COMMAND_EXECUTE',
-    action: 'EXECUTED',
-    commandName,
-    userId,
-    guildId,
-    executionTimeMs,
-    tags: ['command'],
-    ...options,
-  });
-}
-
-async function logSettingsUpdated(guildId, beforeState, afterState, options = {}) {
-  await logInfo('Settings updated', {
-    operation: 'SETTINGS_UPDATE',
-    action: 'UPDATED',
-    guildId,
-    beforeState,
-    afterState,
-    tags: ['settings', 'config'],
-    ...options,
-  });
-}
-
-async function logSchedulerEvent(schedulerName, action, details, error = null, options = {}) {
-  const logFn = error ? logError : logInfo;
-  await logFn(`Scheduler: ${schedulerName} - ${action}`, error, {
-    operation: 'SCHEDULER_EVENT',
-    action,
-    metadata: details,
-    tags: ['scheduler', schedulerName.toLowerCase()],
-    ...options,
-  });
+function silenceConsole() {
+  const noop = () => {};
+  return { log: console.log, error: console.error, warn: console.warn, info: console.info, debug: console.debug };
 }
 
 module.exports = {
   initializeLogsDB,
+  sendLog,
+  sendError,
+  sendWarn,
+  sendDebug,
   logInfo,
   logWarn,
   logError,
   logCritical,
   logDebug,
-  logReminderCreated,
-  logReminderSent,
-  logReminderFailed,
-  logCommandExecuted,
-  logSettingsUpdated,
-  logSchedulerEvent,
+  silenceConsole,
 };
