@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
-const axios = require('axios');
 
 let Log = null;
 let logsConnection = null;
@@ -146,69 +145,9 @@ function createLogDocument(logEntry) {
   };
 }
 
-async function sendToWebhook(webhookUrl, logEntry) {
-  if (!webhookUrl) return;
-
-  try {
-    const embed = {
-      title: `[${logEntry.level}] ${logEntry.operation || 'LOG'}`,
-      description: logEntry.message.substring(0, 4096),
-      color: logEntry.level === 'ERROR' || logEntry.level === 'CRITICAL' ? 0xff0000 : 0x00ff00,
-      fields: [],
-      timestamp: new Date().toISOString()
-    };
-
-    if (logEntry.userId) embed.fields.push({ name: 'User ID', value: logEntry.userId, inline: true });
-    if (logEntry.guildId) embed.fields.push({ name: 'Guild ID', value: logEntry.guildId, inline: true });
-    if (logEntry.action) embed.fields.push({ name: 'Action', value: logEntry.action, inline: true });
-    
-    if (logEntry.metadata) {
-      const metaStr = JSON.stringify(logEntry.metadata, null, 2);
-      if (metaStr.length < 1024) {
-        embed.fields.push({ name: 'Metadata', value: `\`\`\`json\n${metaStr}\n\`\`\``, inline: false });
-      }
-    }
-
-    if (logEntry.errorMessage) {
-      embed.fields.push({ name: 'Error', value: logEntry.errorMessage.substring(0, 1024), inline: false });
-    }
-
-    await axios.post(webhookUrl, {
-      embeds: [embed]
-    });
-  } catch (error) {
-    console.error('Failed to send webhook:', error.message);
-  }
-}
-
 async function saveLogToDB(logEntry) {
-  // Check if this log should go to webhook instead of database
-  const operation = logEntry.operation;
-  const skipDbOperations = ['DROP_COUNT', 'RARITY_DROP'];
-  const reminderOperations = ['REMINDER_SEND', 'REMINDER_CREATE'];
+  // Database logging only - webhooks disabled
   
-  // Send drop logs to LOG_WEBHOOK_URL (skip database)
-  if (skipDbOperations.includes(operation) && process.env.LOG_WEBHOOK_URL) {
-    await sendToWebhook(process.env.LOG_WEBHOOK_URL, logEntry);
-    return; // Skip database
-  }
-  
-  // Send reminder errors to ERROR_WEBHOOK_URL (skip database)
-  if (reminderOperations.includes(operation) && 
-      (logEntry.level === 'ERROR' || logEntry.level === 'CRITICAL' || logEntry.action === 'FAILED') && 
-      process.env.ERROR_WEBHOOK_URL) {
-    await sendToWebhook(process.env.ERROR_WEBHOOK_URL, logEntry);
-    return; // Skip database
-  }
-
-  // Send reminder success to LOG_WEBHOOK_URL (skip database)
-  if (reminderOperations.includes(operation) && 
-      (logEntry.action === 'SENT' || logEntry.action === 'CREATED') && 
-      process.env.LOG_WEBHOOK_URL) {
-    await sendToWebhook(process.env.LOG_WEBHOOK_URL, logEntry);
-    return; // Skip database
-  }
-
   // Only save CRITICAL operations to database to save storage
   const saveToDbOperations = [
     'SETTINGS_UPDATE',
@@ -221,11 +160,7 @@ async function saveLogToDB(logEntry) {
   const saveToDbLevels = ['CRITICAL', 'ERROR'];
   
   // Skip database if not in critical operations list and not error/critical level
-  if (!saveToDbOperations.includes(operation) && !saveToDbLevels.includes(logEntry.level)) {
-    // Send to webhook if available, otherwise just skip
-    if (process.env.LOG_WEBHOOK_URL) {
-      await sendToWebhook(process.env.LOG_WEBHOOK_URL, logEntry);
-    }
+  if (!saveToDbOperations.includes(logEntry.operation) && !saveToDbLevels.includes(logEntry.level)) {
     return;
   }
 
