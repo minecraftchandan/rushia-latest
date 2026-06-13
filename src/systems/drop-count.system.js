@@ -24,28 +24,43 @@ async function processDropCount(message) {
   if (!userId) return;
 
   try {
+    const dropTime = new Date();
     const result = await Drops.findOneAndUpdate(
       { userId, guildId: message.guild.id },
       {
         $inc: { drop_count: 1 },
-        $set: { droppedAt: new Date() }
+        $set: { droppedAt: dropTime }
       },
       { upsert: true, new: true }
     );
 
     await logInfo(`[DROP] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (Total: ${result.drop_count})`, {
-      category: 'DROP_COUNT',
+      operation: 'DROP_COUNT',
+      action: 'DROPPED',
       userId,
       guildId: message.guild.id,
-      cardName: cardData.cardName,
-      rarity: cardData.rarity,
-      drop_count: result.drop_count
+      channelId: message.channel.id,
+      metadata: {
+        category: 'DROP_COUNT',
+        cardName: cardData.cardName,
+        rarity: cardData.rarity,
+        drop_count: result.drop_count,
+        droppedAt: dropTime.toISOString(),
+        guildName: message.guild.name
+      },
+      tags: ['drop', 'card', cardData.rarity.toLowerCase()]
     });
   } catch (error) {
     await logError(`[DROP ERROR] Failed to update: ${error.message}`, error, {
-      category: 'DROP_COUNT',
+      operation: 'DROP_COUNT',
+      action: 'FAILED',
       userId,
-      guildId: message.guild.id
+      guildId: message.guild.id,
+      channelId: message.channel.id,
+      metadata: {
+        category: 'DROP_COUNT'
+      },
+      tags: ['drop', 'error']
     });
   }
 }

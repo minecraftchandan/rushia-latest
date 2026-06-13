@@ -1,4 +1,5 @@
 const RarityDrop = require('../database/rarity-drop.model');
+const Drops = require('../database/drops.model');
 const { parseCardEmbed } = require('../utils/embed.parser');
 const { logInfo, logError } = require('../utils/logger');
 
@@ -28,17 +29,19 @@ async function processRarityDrop(message) {
 
   try {
     const updateField = cardData.rarity === 'Legendary' ? 'legendary_count' : 'exotic_count';
+    const dropTime = new Date();
     
     let result;
     let retries = 3;
     
+    // Update rarity count
     while (retries > 0) {
       try {
         result = await RarityDrop.findOneAndUpdate(
           { userId, guildId: message.guild.id },
           {
             $inc: { [updateField]: 1 },
-            $set: { droppedAt: new Date() }
+            $set: { droppedAt: dropTime }
           },
           { upsert: true, new: true }
         );
@@ -53,27 +56,47 @@ async function processRarityDrop(message) {
       }
     }
 
-    sendLog(`[RARITY] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (L:${result.legendary_count} E:${result.exotic_count})`);
+    // Also update total drop count
+    await Drops.findOneAndUpdate(
+      { userId, guildId: message.guild.id },
+      {
+        $inc: { drop_count: 1 },
+        $set: { droppedAt: dropTime }
+      },
+      { upsert: true }
+    );
 
-    await sendLog(`[RARITY DROP] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (L:${result.legendary_count} E:${result.exotic_count})`, {
-      category: 'RARITY_DROP',
+    await logInfo(`[RARITY] ${cardData.rarity} - ${cardData.cardName} by ${userId} in ${message.guild.name} (L:${result.legendary_count} E:${result.exotic_count})`, {
+      operation: 'RARITY_DROP',
+      action: 'DROPPED',
       userId,
       guildId: message.guild.id,
-      cardName: cardData.cardName,
-      seriesName: cardData.seriesName,
-      rarity: cardData.rarity,
-      legendary_count: result.legendary_count,
-      exotic_count: result.exotic_count
+      channelId: message.channel.id,
+      metadata: {
+        category: 'RARITY_DROP',
+        cardName: cardData.cardName,
+        seriesName: cardData.seriesName,
+        rarity: cardData.rarity,
+        legendary_count: result.legendary_count,
+        exotic_count: result.exotic_count,
+        droppedAt: dropTime.toISOString(),
+        guildName: message.guild.name
+      },
+      tags: ['rarity', 'drop', cardData.rarity.toLowerCase()]
     });
   } catch (error) {
-    sendError('[RARITY ERROR]', error.message);
-    await sendError(`[RARITY DROP] Failed to update tracker: ${error.message}`, {
-      category: 'RARITY_DROP',
+    await logError('[RARITY ERROR] Failed to update tracker', error, {
+      operation: 'RARITY_DROP',
+      action: 'FAILED',
       userId,
       guildId: message.guild.id,
-      cardName: cardData.cardName,
-      rarity: cardData.rarity,
-      error: error.stack
+      channelId: message.channel.id,
+      metadata: {
+        category: 'RARITY_DROP',
+        cardName: cardData.cardName,
+        rarity: cardData.rarity
+      },
+      tags: ['rarity', 'drop', 'error']
     });
   }
 }
