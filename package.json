@@ -17,6 +17,7 @@
     "seed": "node dev/scripts/seedDatabase.js"
   },
   "dependencies": {
+    "axios": "^1.17.0",
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.0",
     "mongoose": "^8.16.2",
