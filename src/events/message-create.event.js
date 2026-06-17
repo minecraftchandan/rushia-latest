@@ -55,6 +55,12 @@ module.exports = {
                 return;
             }
             
+            if (content.match(/^here$/i)) {
+                const { handleHereCommand } = require('../systems/channel-override.system');
+                await handleHereCommand(message);
+                return;
+            }
+            
             if (content.match(/^logs$/i)) {
                 const { handleLogsCommand } = require('../commands/logs');
                 await handleLogsCommand(message);
@@ -196,6 +202,12 @@ module.exports = {
             if (command === 'help') {
                 const { handleHelpCommand } = require('../commands/help');
                 await handleHelpCommand(message);
+                return;
+            }
+            
+            if (command === 'here') {
+                const { handleHereCommand } = require('../systems/channel-override.system');
+                await handleHereCommand(message);
                 return;
             }
             

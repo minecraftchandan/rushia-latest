@@ -35,6 +35,7 @@ const helpCategories = {
       { name: '/notifications set', value: 'Enable/disable notifications\n**Types:** expedition, stamina, raid, raidSpawnReminder, drop' },
       { name: '/dm enable <type>', value: 'Receive reminders via DM\n**Types:** expedition, stamina, raidSpawn, drop' },
       { name: '/dm disable <type>', value: 'Receive reminders in channel instead of DM' },
+      { name: '@bot here', value: 'Redirect YOUR raid reminders to current channel for 2 hours\n-# ⚠️ Use AFTER attacking a raid (updates existing reminders)' },
       { name: '/suggestion', value: 'Send a suggestion to the bot owner (max 1000 chars)' }
     ]
   },
@@ -95,6 +96,7 @@ const helpCategories = {
       { name: 'Stamina Reminders', value: 'Auto-reminds when stamina refills to configured percentage' },
       { name: 'Expedition Reminders', value: 'Auto-reminds when expeditions complete' },
       { name: 'Raid Reminders', value: 'Reminds when raid fatigue recovers + 30-min spawn reminder' },
+      { name: 'Channel Override', value: 'Use `@bot here` to redirect your raid reminders to any channel for 2 hours' },
       { name: 'Drop Tracking', value: 'Tracks all drops and rare drops (Exotic/Legendary)' }
     ]
   }

@@ -12,7 +12,11 @@ const reminderSchema = new mongoose.Schema({
   sentAt: { type: Date },
   claimedAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  // Channel override fields
+  overrideChannelId: { type: String },
+  overrideExpiresAt: { type: Date },
+  originalChannelId: { type: String }
 }, {
   timestamps: false,
   collection: 'reminders'
@@ -36,6 +40,12 @@ reminderSchema.index({ sentAt: 1 }, {
 
 // CLEANUP INDEX
 reminderSchema.index({ createdAt: 1, status: 1 }, { name: 'idx_cleanup' });
+
+// OVERRIDE EXPIRATION INDEX: Fast lookup for expired overrides
+reminderSchema.index({ overrideExpiresAt: 1 }, {
+  partialFilterExpression: { overrideExpiresAt: { $exists: true } },
+  name: 'idx_override_expiration'
+});
 
 // UNIQUE INDEX: Prevent duplicate expedition reminders — pending and claimed
 reminderSchema.index({ userId: 1, cardId: 1, type: 1 }, {
@@ -113,4 +123,68 @@ reminderSchema.statics.revertClaimed = async function(reminderIds) {
   );
 };
 
-module.exports = mongoose.model('Reminder', reminderSchema);
+// Set channel override for user's raid reminders
+reminderSchema.statics.setChannelOverride = async function(userId, overrideChannelId, expiresAt) {
+  // Find all raid reminders without originalChannelId set and update them
+  const remindersToUpdate = await this.find({
+    userId,
+    type: { $in: ['raid', 'raidSpawn'] },
+    status: { $in: ['pending', 'claimed'] }
+  }).exec();
+
+  const updatePromises = remindersToUpdate.map(reminder => {
+    const update = {
+      overrideChannelId,
+      overrideExpiresAt: expiresAt,
+      updatedAt: new Date()
+    };
+    
+    // Only set originalChannelId if it doesn't exist
+    if (!reminder.originalChannelId) {
+      update.originalChannelId = reminder.channelId;
+    }
+    
+    return this.updateOne({ _id: reminder._id }, { $set: update });
+  });
+
+  await Promise.all(updatePromises);
+  
+  return { modifiedCount: remindersToUpdate.length };
+};
+
+// Clear expired overrides and restore original channels
+reminderSchema.statics.clearExpiredOverrides = async function() {
+  const now = new Date();
+  const expiredReminders = await this.find({
+    overrideExpiresAt: { $lte: now },
+    status: { $in: ['pending', 'claimed'] }
+  }).lean().exec();
+
+  if (expiredReminders.length === 0) return [];
+
+  await this.updateMany(
+    { _id: { $in: expiredReminders.map(r => r._id) } },
+    {
+      $unset: { overrideChannelId: '', overrideExpiresAt: '', originalChannelId: '' },
+      $set: { updatedAt: new Date() }
+    }
+  );
+
+  // Return unique userIds for notification
+  return [...new Set(expiredReminders.map(r => r.userId))];
+};
+
+// Get effective channel for reminder (considers override)
+reminderSchema.methods.getEffectiveChannel = function() {
+  if (this.overrideChannelId && this.overrideExpiresAt && this.overrideExpiresAt > new Date()) {
+    return this.overrideChannelId;
+  }
+  return this.channelId;
+};
+
+// Check if reminder has active override
+reminderSchema.methods.hasActiveOverride = function() {
+  return !!(this.overrideChannelId && this.overrideExpiresAt && this.overrideExpiresAt > new Date());
+};
+
+module.exports = mongoose.model('Reminder', reminderSchema, 'reminders');

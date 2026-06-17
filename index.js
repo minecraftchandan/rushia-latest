@@ -245,3 +245,5 @@ process.on('uncaughtException', (error) => {
 client.on('error', (error) => {
   logError('[CLIENT ERROR]', error, { category: 'SYSTEM' }).catch(() => {});
 });
+
+module.exports = { client };

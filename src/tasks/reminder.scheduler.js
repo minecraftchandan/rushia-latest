@@ -1,6 +1,6 @@
 const Reminder = require('../database/reminder.model');
+const ChannelOverride = require('../database/channel-override.model');
 const { getUserSettings } = require('../utils/user-settings.manager');
-const { sendLog, sendError } = require('../utils/logger');
 const { SCHEDULER } = require('../config/constants');
 
 let schedulerTimeout = null;
@@ -30,11 +30,42 @@ async function checkReminders(client) {
           type: reminder.type,
           remindAt: reminder.remindAt,
           reminderIds: [],
+          originalChannelId: reminder.channelId
         };
       }
       acc[key].reminderIds.push(reminder._id);
       return acc;
     }, {});
+
+    // Check for user-level overrides for raid reminders
+    const userIds = [...new Set(Object.values(remindersToProcess).map(r => r.userId))];
+    const overridePromises = userIds.map(userId => ChannelOverride.getActiveOverride(userId));
+    const overrides = await Promise.all(overridePromises);
+    const overrideMap = new Map();
+    
+    overrides.forEach((override, index) => {
+      if (override) {
+        overrideMap.set(userIds[index], override);
+      }
+    });
+
+    // Apply overrides to raid reminders
+    for (const key in remindersToProcess) {
+      const reminderData = remindersToProcess[key];
+      if (reminderData.type === 'raid' || reminderData.type === 'raidSpawn') {
+        const override = overrideMap.get(reminderData.userId);
+        if (override) {
+          reminderData.effectiveChannelId = override.channelId;
+          reminderData.hasOverride = true;
+        } else {
+          reminderData.effectiveChannelId = reminderData.channelId;
+          reminderData.hasOverride = false;
+        }
+      } else {
+        reminderData.effectiveChannelId = reminderData.channelId;
+        reminderData.hasOverride = false;
+      }
+    }
 
     const sendPromises = [];
     const failedReminderIds = [];
@@ -78,7 +109,8 @@ async function checkReminders(client) {
             : sendReminder;
 
           if (reminderData.type === 'raid') {
-            sendInDm = true;
+            // If user has active channel override, don't send to DM
+            sendInDm = !reminderData.hasOverride;
           } else if (reminderData.type === 'stamina') {
             sendInDm = userSettings?.staminaDM;
           } else if (reminderData.type === 'expedition') {
@@ -98,73 +130,30 @@ async function checkReminders(client) {
                 if (user) {
                   await user.send(reminderData.reminderMessage);
                   sendSuccess = true;
-                  await sendLog('REMINDER_SENT', { 
-                    category: 'REMINDER',
-                    action: 'SENT',
-                    type: reminderData.type,
-                    userId: reminderData.userId,
-                    guildId: reminderData.guildId,
-                    method: 'DM'
-                  });
                 }
               } else {
-                const channel = await client.channels.fetch(reminderData.channelId);
+                const channel = await client.channels.fetch(reminderData.effectiveChannelId);
                 if (channel) {
                   const guild = channel.guild;
                   await channel.send(reminderData.reminderMessage);
                   sendSuccess = true;
-                  await sendLog('REMINDER_SENT', { 
-                    category: 'REMINDER',
-                    action: 'SENT',
-                    type: reminderData.type,
-                    userId: reminderData.userId,
-                    guildId: reminderData.guildId,
-                    guildName: guild?.name,
-                    channelId: reminderData.channelId,
-                    method: 'CHANNEL'
-                  });
                 }
               }
             } catch (innerError) {
-              const guild = reminderData.guildId ? await client.guilds.fetch(reminderData.guildId).catch(() => null) : null;
-              await sendError('REMINDER_SEND_FAILED', {
-                category: 'REMINDER',
-                action: 'SEND_FAILED',
-                type: reminderData.type,
-                userId: reminderData.userId,
-                guildId: reminderData.guildId,
-                guildName: guild?.name,
-                channelId: reminderData.channelId,
-                method: sendInDm ? 'DM' : 'CHANNEL',
-                error: innerError.message,
-                errorCode: innerError.code
-              });
               sendSuccess = false;
             }
             
             if (sendSuccess) {
               await Reminder.markAsSent(reminderData.reminderIds);
               sentReminderIds.push(...reminderData.reminderIds);
-              await sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} reminders as sent`, { category: 'REMINDER' });
             } else {
               failedReminderIds.push(...reminderData.reminderIds);
-              await sendLog(`[REMINDER] Marked ${reminderData.reminderIds.length} ${reminderData.type} reminders for retry`, { category: 'REMINDER' });
             }
           } else {
             await Reminder.deleteMany({ _id: { $in: reminderData.reminderIds } });
-            await sendLog(`[REMINDER] Deleted ${reminderData.reminderIds.length} disabled ${reminderData.type} reminders`, { category: 'REMINDER' });
           }
         } catch (error) {
-          const guild = reminderData.guildId ? await client.guilds.fetch(reminderData.guildId).catch(() => null) : null;
-          await sendError('REMINDER_SEND_FAILED', { 
-            category: 'REMINDER',
-            action: 'SEND_FAILED',
-            type: reminderData.type,
-            userId: reminderData.userId,
-            guildId: reminderData.guildId,
-            guildName: guild?.name,
-            error: error.message
-          });
+          // Silent fail - don't spam logs
         }
       })());
     }
@@ -175,16 +164,11 @@ async function checkReminders(client) {
       const safeToRevert = failedReminderIds.filter(id => !sentReminderIds.some(s => s.equals(id)));
       if (safeToRevert.length > 0) {
         await Reminder.revertClaimed(safeToRevert);
-        await sendLog(`[REMINDER] Reverted ${safeToRevert.length} failed reminders for retry`, { category: 'REMINDER' });
       }
     }
 
   } catch (error) {
-    await sendError('SCHEDULER_ERROR', { 
-      category: 'SYSTEM',
-      action: 'SCHEDULER_ERROR',
-      error: error.message
-    });
+    // Silent - don't spam logs
   }
 }
 
@@ -193,12 +177,11 @@ function startScheduler(client) {
   
   (function schedule() {
     schedulerTimeout = setTimeout(() => {
-      checkReminders(client)
-        .catch(error => sendError('SCHEDULER_ERROR', { category: 'SYSTEM', action: 'SCHEDULER_ERROR', error: error.message }));
+      checkReminders(client).catch(() => {}); // Silent error handling
       schedule();
     }, SCHEDULER.CHECK_INTERVAL);
   })();
-  sendLog('[SCHEDULER] Reminder scheduler started.', { category: 'SYSTEM' });
+  // Silent start - no log
 }
 
 module.exports = { startScheduler, stopScheduler };
