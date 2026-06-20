@@ -38,6 +38,13 @@ reminderSchema.index({ sentAt: 1 }, {
   name: 'idx_ttl_sent'
 });
 
+// TTL INDEX: Auto-delete stuck claimed reminders after 5 minutes (safety net)
+reminderSchema.index({ claimedAt: 1 }, {
+  expireAfterSeconds: 300,
+  partialFilterExpression: { status: 'claimed' },
+  name: 'idx_ttl_claimed'
+});
+
 // CLEANUP INDEX
 reminderSchema.index({ createdAt: 1, status: 1 }, { name: 'idx_cleanup' });
 
@@ -109,10 +116,13 @@ reminderSchema.statics.getDueReminders = async function(windowMs = 2000, limit =
 
 // Mark as sent — transitions claimed → sent, TTL will clean up
 reminderSchema.statics.markAsSent = async function(reminderIds) {
-  return await this.updateMany(
+  const result = await this.updateMany(
     { _id: { $in: reminderIds }, status: 'claimed' },
-    { $set: { status: 'sent', sentAt: new Date() } }
+    { $set: { status: 'sent', sentAt: new Date(), updatedAt: new Date() } }
   );
+  
+  // If some reminders weren't marked (already sent or deleted), still return success
+  return result;
 };
 
 // Revert claimed → pending on send failure so scheduler retries

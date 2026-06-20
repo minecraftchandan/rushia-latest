@@ -144,8 +144,12 @@ async function checkReminders(client) {
             }
             
             if (sendSuccess) {
-              await Reminder.markAsSent(reminderData.reminderIds);
-              sentReminderIds.push(...reminderData.reminderIds);
+              const markResult = await Reminder.markAsSent(reminderData.reminderIds);
+              if (markResult.modifiedCount > 0) {
+                sentReminderIds.push(...reminderData.reminderIds);
+              } else {
+                failedReminderIds.push(...reminderData.reminderIds);
+              }
             } else {
               failedReminderIds.push(...reminderData.reminderIds);
             }
