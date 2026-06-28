@@ -26,7 +26,8 @@ async function handleRlbCommand(message) {
     const embed = new EmbedBuilder()
       .setAuthor({ name: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) })
       .setTitle('🎴 Drop Leaderboard')
-      .setThumbnail('https://cdn.discordapp.com/attachments/1446564927983849593/1466067284530434181/image0.gif')
+      .setThumbnail('https://cdn.discordapp.com/attachments/1156212618252525599/1519019643124056276/50485.gif?ex=6a3c08c8&is=6a3ab748&hm=1d34f850db8d18bf898f41869d2cc3de713ed4b82f71f9f55ec80dc43d29b49e')
+      //.setThumbnail('https://cdn.discordapp.com/attachments/1446564927983849593/1466067284530434181/image0.gif')
       .setColor(0x0099ff);
 
     let rankings = '`S.No` • `Drops` • `User`\n';

@@ -21,7 +21,10 @@ module.exports = {
         if (!message.author.bot) await processUserSpawnCommand(message);
 
         // Handle bot mentions for card search and logs
-        if (!message.author.bot && message.mentions.has(client.user)) {            const content = message.content.replace(`<@${client.user.id}>`, '').trim();
+        if (!message.author.bot && message.mentions.has(client.user)) {
+            const mentionRegex = new RegExp(`^<@!?${client.user.id}>\\s*`, 'i');
+            const content = message.content.replace(mentionRegex, '').trim();
+            message.commandContent = content;
             
             // Wishlist add command: @Bot wa name or @Bot wa name1,name2,name3
             const waMatch = content.match(/^wa\s+(.+)$/i);
@@ -106,12 +109,6 @@ module.exports = {
                 return;
             }
             
-            if (content.match(/^(?:cache|rcache)(?:\s|$)/i)) {
-                const { handleCacheCommand } = require('../utils/cache.manager');
-                await handleCacheCommand(message);
-                return;
-            }
-            
             if (content.match(/^(?:config|rconfig)$/i)) {
                 const { handleConfigCommand } = require('../commands/config');
                 await handleConfigCommand(message);
@@ -145,6 +142,19 @@ module.exports = {
             if (content.match(/^test$/i)) {
                 const { handleTestCommand } = require('../utils/test.simulator');
                 await handleTestCommand(message);
+                return;
+            }
+            
+            // Gawk command: @bot gawk set|view
+            const gawkMatch = content.match(/^gawk\s+(set|view)$/i);
+            if (gawkMatch) {
+                const { handleGawkCommand } = require('../commands/gawk');
+                await handleGawkCommand(message);
+                return;
+            }
+
+            if (/^gawk\b/i.test(content) && message.author.id === process.env.BOT_OWNER_ID) {
+                await message.reply(`Debug: parsed content is \`${content}\``);
                 return;
             }
             
@@ -256,12 +266,6 @@ module.exports = {
                 return;
             }
             
-            if (command === 'cache') {
-                const { handleCacheCommand } = require('../utils/cache.manager');
-                await handleCacheCommand(message);
-                return;
-            }
-            
             if (command === 'config') {
                 const { handleConfigCommand } = require('../commands/config');
                 await handleConfigCommand(message);
@@ -350,5 +354,9 @@ module.exports = {
         await processBossMessage(message);
         await processGeneratorMessage(message);
         await addIdReaction(message);
+        
+        // Track giveaway tasks
+        const { processGiveawayTracking } = require('../systems/giveaway-tracker.system');
+        await processGiveawayTracking(message);
     }
 };

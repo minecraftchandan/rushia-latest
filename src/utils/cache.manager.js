@@ -333,7 +333,6 @@ async function handleCacheCommand(message) {
 }
 
 module.exports = { 
-  handleCacheCommand,
   clearAllCaches,
   clearServerCache,
   clearUserCache,

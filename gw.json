@@ -1,0 +1,155 @@
+{
+  "guild_id": "597328712257503233",
+  "tasks": {
+    "drop": {
+      "task_type": "drop",
+      "is_embed": true,
+      "detection_pattern": {
+        "embed_title_contains": "Card Dropped",
+        "footer_pattern": "Claimed by (.+)",
+        "user_extraction": "footer"
+      },
+      "template": {
+        "author": {
+          "id": "1269481871021047891",
+          "username": "Luvi",
+          "bot": true
+        },
+        "content": "",
+        "type": 0,
+        "interaction_metadata": {
+          "user_id": "{user_id}"
+        },
+        "embeds": [
+          {
+            "type": "rich",
+            "title": "<a:LU_Sparkles:1425834271331061900> Card Dropped! <a:LU_Sparkles:1425834271331061900>",
+            "description": "<:LU_R:1368396991687557150> **{card_name}**\n-# <:LU_HP:1368399211481006151> **{hp}** | <:LU_ATK:1368399148264718419> **{atk}**\n-# Series: {series}\n-# ID: `{card_id}`",
+            "color": 3447003,
+            "fields": [
+              {
+                "name": "<:LU_Gold:1368396297085911221> Gold Gained",
+                "value": "`+{gold}` Gold",
+                "inline": true
+              },
+              {
+                "name": "<:LU_XP:1368396311971237970> XP Gained",
+                "value": "`+{xp}` XP",
+                "inline": true
+              }
+            ],
+            "image": {
+              "url": "{image_url}"
+            },
+            "footer": {
+              "text": "Claimed by {username}"
+            }
+          }
+        ],
+        "components": [],
+        "attachments": []
+      }
+    },
+    "clash": {
+      "task_type": "clash",
+      "is_embed": false,
+      "detection_pattern": {
+        "content_regex": "<@(\\d+)>, your clash battle has ended! You defeated \\*\\*(.+?)\\*\\*",
+        "user_extraction": "mention"
+      },
+      "template": {
+        "author": {
+          "id": "1269481871021047891",
+          "username": "Luvi",
+          "bot": true
+        },
+        "content": "<@{user_id}>, your clash battle has ended! You defeated **{defeated_name}**.",
+        "type": 19,
+        "interaction_metadata": {
+          "user_id": "{user_id}"
+        },
+        "embeds": [],
+        "components": [],
+        "attachments": []
+      }
+    },
+    "daily_quests": {
+      "task_type": "daily_quests",
+      "is_embed": true,
+      "detection_pattern": {
+        "embed_title_contains": "Daily Quests",
+        "description_pattern": "\\*\\*(.+?)'s\\*\\* daily quest progress",
+        "completion_check": "fields_with_COMPLETED >= 3",
+        "user_extraction": "description"
+      },
+      "template": {
+        "author": {
+          "id": "1269481871021047891",
+          "username": "Luvi",
+          "bot": true
+        },
+        "content": "",
+        "type": 0,
+        "interaction_metadata": {
+          "user_id": "{user_id}"
+        },
+        "embeds": [
+          {
+            "type": "rich",
+            "title": "📋 Daily Quests",
+            "description": "**{username}'s** daily quest progress\n\n⏰ Reset in {reset_time}",
+            "color": 3447003,
+            "fields": [
+              {
+                "name": "<:LU_Card:1368400904671461376> Card Dropper",
+                "value": "Drop {drop_count} cards\n{drop_status}",
+                "inline": false
+              },
+              {
+                "name": "<:LU_Monster:1368401599776686151> Boss Hunter",
+                "value": "Defeat {boss_count} bosses\n{boss_status}",
+                "inline": false
+              },
+              {
+                "name": "<:LU_Clash:1368404245769879553> Victorious",
+                "value": "Win {clash_count} clash battles\n{clash_status}",
+                "inline": false
+              },
+              {
+                "name": "Progress",
+                "value": "Completed: {completed_count}/3 quests",
+                "inline": false
+              },
+              {
+                "name": "__Rewards__",
+                "value": "<:LU_EtherealCore:1388771700291665930> **{core_count}** Ethereal Core\n<:LU_Gold:1368396297085911221> **{reward_gold}** Gold",
+                "inline": false
+              }
+            ],
+            "content_scan_version": 0
+          }
+        ],
+        "components": [
+          {
+            "type": 1,
+            "id": 1,
+            "components": [
+              {
+                "type": 2,
+                "id": 2,
+                "custom_id": "quest_rewards_button",
+                "style": 2,
+                "label": "Rewards Claimed",
+                "disabled": true,
+                "emoji": {
+                  "name": "💎"
+                }
+              }
+            ]
+          }
+        ],
+        "attachments": []
+      }
+    }
+  }
+}

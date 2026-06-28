@@ -57,6 +57,9 @@ module.exports = {
             }
         } else if (interaction.isStringSelectMenu()) {
             try {
+                const { handleGawkInteraction } = require('../commands/gawk');
+                if (await handleGawkInteraction(interaction)) return;
+                
                 const { handleReminderInteraction } = require('../utils/reminder.viewer');
                 if (await handleReminderInteraction(interaction)) return;
                 const { handleHelpCategory } = require('../commands/help');
@@ -141,8 +144,18 @@ module.exports = {
             } catch (error) {
                 sendError('Error handling string select menu:', error);
             }
+        } else if (interaction.isModalSubmit()) {
+            try {
+                const { handleGawkInteraction } = require('../commands/gawk');
+                if (await handleGawkInteraction(interaction)) return;
+            } catch (error) {
+                sendError('Error handling modal submit:', error);
+            }
         } else if (interaction.isButton()) {
             try {
+                const { handleGawkInteraction } = require('../commands/gawk');
+                if (await handleGawkInteraction(interaction)) return;
+                
                 // Config toggle handler
                 const { handleConfigToggle } = require('../commands/config');
                 if (await handleConfigToggle(interaction)) return;

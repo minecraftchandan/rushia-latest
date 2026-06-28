@@ -85,7 +85,7 @@ const helpCategories = {
       { name: 'Setup', value: 'Use `/set-pog-channel channel:#pog-alerts` or `/set-pog-channel channel-id:123456789`' },
       { name: 'Features', value: '• Detects drops with hearts > 99\n• Animated embed with all heart values\n• "Jump to Message" button\n• Mentions the user who got the drop' },
       { name: 'Series Hearts', value: 'Bot also shows heart values for series when Luvi posts series selection embeds' },
-      { name: 'Cache Management', value: 'Owner can use `rcache` commands to refresh POG settings' }
+      { name: 'Cache Management', value: 'Cache is automatically refreshed every 5 minutes' }
     ]
   },
   auto: {

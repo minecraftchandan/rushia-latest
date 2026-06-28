@@ -15,6 +15,9 @@ try {
 // Store search results for user selection
 const userSearches = new Map();
 const paginationStates = new Map();
+const searchTimeouts = new Map();
+
+const SEARCH_TIMEOUT = 30000; // 30 seconds
 
 function searchCards(query) {
   const terms = query.toLowerCase().split(' ');
@@ -62,7 +65,7 @@ function createResultsEmbed(results, userId, page = 0) {
   
   const embed = new EmbedBuilder()
     .setTitle(`Found ${results.length} results`)
-    .setDescription(`Page ${page + 1}/${totalPages} - Reply with the number to select:`)
+    .setDescription(`Page ${page + 1}/${totalPages} - Reply with the number to select:\n⏱️ This search will expire in 30 seconds`)
     .setColor(0xffff00)
     .setFooter({ text: '✨ = Iconic' });
   
@@ -79,6 +82,21 @@ function createResultsEmbed(results, userId, page = 0) {
   
   userSearches.set(userId, results);
   paginationStates.set(userId, { page, totalPages });
+  
+  // Clear any existing timeout
+  if (searchTimeouts.has(userId)) {
+    clearTimeout(searchTimeouts.get(userId));
+  }
+  
+  // Set new timeout
+  const timeout = setTimeout(() => {
+    userSearches.delete(userId);
+    paginationStates.delete(userId);
+    searchTimeouts.delete(userId);
+  }, SEARCH_TIMEOUT);
+  
+  searchTimeouts.set(userId, timeout);
+  
   return embed;
 }
 
@@ -192,7 +210,18 @@ module.exports = {
     } else {
       const embed = createResultsEmbed(results, message.author.id, 0);
       const buttons = createPaginationButtons(message.author.id, 0, Math.ceil(results.length / 10));
-      await loadingMsg.edit({ embeds: [embed], components: [buttons] });
+      const reply = await loadingMsg.edit({ embeds: [embed], components: [buttons] });
+      
+      // Disable buttons after 30 seconds
+      setTimeout(async () => {
+        const expiredEmbed = new EmbedBuilder()
+          .setTitle('⏱️ Search Expired')
+          .setDescription(`This search has expired after 30 seconds. Use \`@${message.client.user.username} f <name>\` to search again.`)
+          .setColor(0x808080)
+          .setFooter({ text: '✨ = Iconic' });
+        
+        await reply.edit({ embeds: [expiredEmbed], components: [] }).catch(() => {});
+      }, SEARCH_TIMEOUT);
     }
   },
   
@@ -217,8 +246,15 @@ module.exports = {
       const card = results[selection - 1];
       const embed = createCardEmbed(card);
       await loadingMsg.edit({ embeds: [embed], components: [] });
+      
+      // Clean up
       userSearches.delete(userId);
       paginationStates.delete(userId);
+      if (searchTimeouts.has(userId)) {
+        clearTimeout(searchTimeouts.get(userId));
+        searchTimeouts.delete(userId);
+      }
+      
       return true;
     } else {
       const errorEmbed = new EmbedBuilder()

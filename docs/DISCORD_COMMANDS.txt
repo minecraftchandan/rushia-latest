@@ -99,12 +99,6 @@ Bot auto-reacts on inventory embeds:
 ```
 🔧 **OWNER COMMANDS** (Bot owner only)
 
-**Cache Management:**
-• `rcache` - Refresh all caches
-• `rcache server` - Refresh current server
-• `rcache stats` - View cache statistics
-• Auto-refreshes every 5 minutes
-
 **Logs & Info:**
 • `/logs level:Error` - View bot logs with filters
 • `minfo` - View server POG configuration
@@ -161,8 +155,7 @@ Auto:
 • Ensure hearts > 99
 
 **Cache issues:**
-• Run `rcache` to refresh manually
-• Check `rcache stats` for info
+Cache is auto-refreshed every 5 minutes
 ```
 
 ## MESSAGE 10: QUICK REFERENCE
@@ -171,7 +164,7 @@ Auto:
 
 Slash Commands: `/set-boss-role` `/notifications` `/dm` `/help`
 Mention Commands: `@bot f <card>` `rlb` `wa <card>` `wl` `wr <card>`
-Owner Commands: `rcache` `minfo` `/logs`
+Owner Commands: `minfo` `/logs`
 
 **Notification Types:**
 expedition, stamina, raid, raidSpawnReminder, drop
