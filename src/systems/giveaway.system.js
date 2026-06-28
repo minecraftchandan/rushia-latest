@@ -23,6 +23,13 @@ class GiveawaySystem {
     }
   }
 
+  isAllowedGuild(guildId) {
+    if (!guildId || !this.gwConfig || !this.gwConfig.guild_id) {
+      return false;
+    }
+    return guildId === this.gwConfig.guild_id;
+  }
+
   async sendWebhook(embeds, content = '') {
     if (!this.logWebhookUrl) return;
     try {
@@ -37,6 +44,10 @@ class GiveawaySystem {
 
   async trackTask(guildId, userId, username, taskType, client) {
     try {
+      if (!this.isAllowedGuild(guildId)) {
+        return null;
+      }
+
       // Check if this task type is enabled in server config
       const config = await GiveawayConfig.findOne({ guildId });
       if (!config || !config.tasks[taskType] || !config.tasks[taskType].enabled) {
@@ -166,6 +177,13 @@ class GiveawaySystem {
 
   async setTaskConfig(guildId, guildName, taskType, targetCount, roleId, roleName, createdBy) {
     try {
+      if (!this.isAllowedGuild(guildId)) {
+        return {
+          success: false,
+          message: 'This feature is only available in the configured server.'
+        };
+      }
+
       let config = await GiveawayConfig.findOne({ guildId });
       
       // Check if server already has an enabled giveaway task

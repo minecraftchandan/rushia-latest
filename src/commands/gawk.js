@@ -8,20 +8,18 @@ const giveawaySystem = require('../systems/giveaway.system');
  */
 function hasGawkPermission(user, guild) {
   const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-  
-  // Bot owner always has permission
+
   if (user.id === BOT_OWNER_ID) {
     return true;
   }
-  
-  // Check if user has admin permissions in guild
+
   if (guild && guild.members) {
     const member = guild.members.cache.get(user.id);
     if (member && member.permissions.has(PermissionFlagsBits.Administrator)) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -51,6 +49,7 @@ function summarizeTaskConfig(config) {
     .map(([taskType, task]) => ({
       taskType,
       targetCount: task.targetCount,
+      roleId: task.roleId,
       roleName: task.roleName,
       enabled: task.enabled,
       createdBy: task.createdBy
@@ -72,9 +71,10 @@ function buildGawkViewEmbed(config, guild) {
   if (summary.hasConfig) {
     embed.setDescription(`A giveaway configuration is currently active for ${guild?.name || 'this server'}.`);
     summary.tasks.forEach((task) => {
+      const roleDisplay = task.roleId ? `<@&${task.roleId}>` : task.roleName || 'Unknown Role';
       embed.addFields({
         name: `${getTaskEmoji(task.taskType)} ${getTaskName(task.taskType)}`,
-        value: `Target Count: ${task.targetCount}\nRole: ${task.roleName}\nStatus: ${task.enabled ? 'Enabled' : 'Disabled'}`,
+        value: `Target Count: ${task.targetCount}\nRole: ${roleDisplay}\nStatus: ${task.enabled ? 'Enabled' : 'Disabled'}`,
         inline: false
       });
     });
@@ -101,8 +101,23 @@ async function handleGawkCommand(message) {
   const subcommand = args[1]?.toLowerCase();
 
   if (!subcommand || !['set', 'view'].includes(subcommand)) {
-    await message.reply('❌ Usage: `@bot gawk set` or `@bot gawk view`');
+    await message.reply('❌ Usage: `@Rushia gawk set` or `@Rushia gawk view`');
     return;
+  }
+
+  if (!giveawaySystem.isAllowedGuild(message.guild?.id)) {
+    await message.reply('🚫 Giveaway tracker is only available in the configured server.');
+    return;
+  }
+
+  const existingConfig = await giveawaySystem.getServerConfig(message.guild.id);
+  const hasConfig = existingConfig && Object.entries(existingConfig.tasks || {}).some(([, task]) => task);
+
+  if (subcommand === 'set') {
+    if (hasConfig) {
+      await message.reply('❌ A giveaway config already exists for this server. Check `@Rushia gawk view` to view/edit it.');
+      return;
+    }
   }
 
   if (subcommand === 'view') {
