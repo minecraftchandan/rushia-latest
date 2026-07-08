@@ -10,7 +10,7 @@ const MAX_PENDING_LOGS = 1000;
 // Log Schema with comprehensive fields
 const logSchema = new mongoose.Schema({
   // Unique identifier for tracing
-  correlationId: { type: String, required: true, index: true },
+  correlationId: { type: String, required: true },
   
   // Log level
   level: { 
@@ -27,12 +27,12 @@ const logSchema = new mongoose.Schema({
   stackTrace: { type: String },
   
   // Timing
-  timestamp: { type: Date, default: Date.now, index: true },
+  timestamp: { type: Date, default: Date.now },
   executionTimeMs: { type: Number }, // milliseconds taken to complete operation
   
   // Context identifiers
-  guildId: { type: String, index: true },
-  userId: { type: String, index: true },
+  guildId: { type: String },
+  userId: { type: String },
   channelId: { type: String },
   
   // Operation details

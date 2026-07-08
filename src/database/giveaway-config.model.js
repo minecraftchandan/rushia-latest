@@ -38,8 +38,7 @@ const giveawayConfigSchema = new mongoose.Schema({
   guildId: { 
     type: String, 
     required: true, 
-    unique: true,
-    index: true 
+    unique: true
   },
   guildName: { 
     type: String, 
