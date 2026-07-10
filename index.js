@@ -16,6 +16,7 @@ const { startScheduler } = require('./src/tasks/reminder.scheduler');
 const { initializeSettings } = require('./src/utils/settings.manager');
 const DatabaseManager = require('./src/database/database.manager');
 const { logInfo, logError, logCritical, sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
+const { createHealthServer } = require('./src/web/health.server');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
 
 const client = new Client({
@@ -28,6 +29,8 @@ const client = new Client({
 });
 
 client.setMaxListeners(25);
+// heartbeat for health checks: timestamp of last processed event
+client.lastEventAt = Date.now();
 
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'src', 'commands');
@@ -75,6 +78,15 @@ client.on(Events.Error, (error) => {
 
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   await handleGeneratorReaction(reaction, user);
+  client.lastEventAt = Date.now();
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  client.lastEventAt = Date.now();
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  client.lastEventAt = Date.now();
 });
 
 client.on(Events.GuildCreate, async (guild) => {
@@ -152,6 +164,13 @@ async function deployCommands(client) {
     console.log('📝 Initializing logs database...');
     await initializeLogsDB();
     console.log('✅ Logs database initialized');
+
+    // Start health HTTP server for deployment platform monitoring
+    try {
+      createHealthServer({ client, logger: require('./src/utils/logger'), port: process.env.HEALTH_PORT || 3000 });
+    } catch (err) {
+      console.error('Failed to start health server:', err.message);
+    }
     
     await deployCommands(client);
     

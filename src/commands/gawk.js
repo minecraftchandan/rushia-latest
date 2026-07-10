@@ -394,7 +394,6 @@ async function handleRoleModal(interaction) {
 }
 
 async function handleDeleteConfigButton(interaction) {
-  // Check if user is bot owner or server admin
   if (!hasGawkPermission(interaction.user, interaction.guild)) {
     await interaction.reply({ 
       content: '🚫 Only server admins and the bot owner can delete the giveaway config.', 
@@ -402,6 +401,8 @@ async function handleDeleteConfigButton(interaction) {
     });
     return;
   }
+
+  await interaction.deferUpdate();
 
   const result = await giveawaySystem.deleteServerConfig(interaction.guild.id, interaction.guild.name, interaction.client);
 
@@ -415,7 +416,7 @@ async function handleDeleteConfigButton(interaction) {
     .setColor(result.success ? 0xED4245 : 0xFEE75C)
     .setTimestamp();
 
-  await interaction.update({ embeds: [embed], components: [] });
+  await interaction.editReply({ embeds: [embed], components: [] });
   sendLog(`Giveaway config deleted in ${interaction.guild.name} by ${interaction.user.tag}`);
 }
 

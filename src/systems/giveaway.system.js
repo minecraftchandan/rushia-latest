@@ -30,6 +30,19 @@ class GiveawaySystem {
     return guildId === this.gwConfig.guild_id;
   }
 
+  getTaskMap(config) {
+    return config?.tasks && typeof config.tasks === 'object' ? config.tasks : {};
+  }
+
+  getTaskConfig(config, taskType) {
+    if (!config || !taskType) {
+      return null;
+    }
+
+    const tasks = this.getTaskMap(config);
+    return tasks[taskType] || null;
+  }
+
   async sendWebhook(embeds, content = '') {
     if (!this.logWebhookUrl) return;
     try {
@@ -50,7 +63,8 @@ class GiveawaySystem {
 
       // Check if this task type is enabled in server config
       const config = await GiveawayConfig.findOne({ guildId });
-      if (!config || !config.tasks[taskType] || !config.tasks[taskType].enabled) {
+      const taskConfig = this.getTaskConfig(config, taskType);
+      if (!config || !taskConfig || !taskConfig.enabled) {
         return null; // Task not configured or disabled
       }
 
@@ -65,8 +79,8 @@ class GiveawaySystem {
           username,
           taskType,
           currentCount: 0,
-          targetCount: config.tasks[taskType].targetCount,
-          roleId: config.tasks[taskType].roleId
+          targetCount: taskConfig.targetCount,
+          roleId: taskConfig.roleId
         });
       }
 
@@ -188,7 +202,8 @@ class GiveawaySystem {
       
       // Check if server already has an enabled giveaway task
       if (config) {
-        const hasEnabledTask = Object.values(config.tasks || {}).some(
+        const tasks = this.getTaskMap(config);
+        const hasEnabledTask = Object.values(tasks).some(
           (task) => task && task.enabled
         );
         if (hasEnabledTask) {
@@ -207,6 +222,7 @@ class GiveawaySystem {
         });
       }
 
+      config.tasks = this.getTaskMap(config);
       config.tasks[taskType] = {
         taskType,
         targetCount,
@@ -247,7 +263,7 @@ class GiveawaySystem {
       const guild = client?.guilds?.cache?.get(guildId);
 
       if (guild) {
-        const roleIds = Object.values(config.tasks || {})
+        const roleIds = Object.values(this.getTaskMap(config))
           .filter(Boolean)
           .map((task) => task.roleId)
           .filter(Boolean);
@@ -281,7 +297,7 @@ class GiveawaySystem {
       await GiveawayConfig.deleteOne({ guildId });
 
       // Send webhook notification about config deletion
-      const tasksList = Object.values(config.tasks || {})
+      const tasksList = Object.values(this.getTaskMap(config))
         .filter(Boolean)
         .map(task => `**${task.taskType}** (Target: ${task.targetCount})`)
         .join('\n');

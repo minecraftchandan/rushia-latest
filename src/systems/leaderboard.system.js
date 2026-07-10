@@ -350,46 +350,98 @@ async function handleCancelReset(interaction) {
   await interaction.update({ content: '❌ Reset cancelled.', components: [] });
 }
 
+function buildClashEmbed(interaction, allClash, page) {
+  const perPage = 10;
+  const totalPages = Math.ceil(allClash.length / perPage);
+  const slice = allClash.slice(page * perPage, (page + 1) * perPage);
+  const totalClashes = allClash.reduce((sum, u) => sum + u.clash_count, 0);
+
+  const embed = new EmbedBuilder()
+    .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) })
+    .setTitle('⚔️ Clash Leaderboard')
+    .setColor(0xe67e22);
+
+  if (!slice.length) {
+    embed.setDescription('📊 No clashes tracked yet in this server.');
+  } else {
+    const maxWidth = Math.max(...slice.map(u => u.clash_count.toString().length), 5);
+    let rankings = '`S.No` • `Clashes` • `User`\n';
+    for (let i = 0; i < slice.length; i++) {
+      const u = slice[i];
+      const rank = `${page * perPage + i + 1}]`.padEnd(4, ' ');
+      rankings += `\`${rank}\` • \`${u.clash_count.toString().padStart(maxWidth, ' ')}\` • <@${u.userId}>\n`;
+    }
+    embed.addFields({ name: '\u200b', value: rankings });
+    embed.setFooter({ text: `Page ${page + 1}/${totalPages} | Participants: ${allClash.length} | Total Clashes: ${totalClashes}` });
+  }
+
+  return embed;
+}
+
+function buildClashComponents(interaction, allClash, page) {
+  const perPage = 10;
+  const back = new ButtonBuilder()
+    .setCustomId(`back_to_drops_${interaction.user.id}_0`)
+    .setLabel('Back')
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji('⬅️');
+
+  const prevButton = new ButtonBuilder()
+    .setCustomId(`clash_prev_${page}`)
+    .setLabel('◀')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(page === 0);
+
+  const nextButton = new ButtonBuilder()
+    .setCustomId(`clash_next_${page}`)
+    .setLabel('▶')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled((page + 1) * perPage >= allClash.length);
+
+  return new ActionRowBuilder().addComponents(back, prevButton, nextButton);
+}
+
 async function handleClashButton(interaction) {
   try {
-    const allowedUserId = interaction.customId.split('_')[3];
-    if (interaction.user.id !== allowedUserId) {
-      return interaction.reply({ content: 'Dont click 😭', ephemeral: true });
-    }
     const guildId = interaction.guild.id;
-    const topClash = await ClashCount.find({ guildId }).sort({ clash_count: -1 }).limit(10);
-    const allClash = await ClashCount.find({ guildId });
-    const totalClashes = allClash.reduce((sum, u) => sum + u.clash_count, 0);
-    const embed = new EmbedBuilder()
-      .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) })
-      .setTitle('⚔️ Clash Leaderboard')
-      .setColor(0xe67e22);
-    if (!topClash.length) {
-      embed.setDescription('📊 No clashes tracked yet in this server.');
-    } else {
-      const maxWidth = Math.max(...topClash.map(u => u.clash_count.toString().length), 5);
-      let rankings = '`S.No` • `Clashes` • `User`\n';
-      for (let i = 0; i < topClash.length; i++) {
-        const u = topClash[i];
-        const rank = (i + 1) + ']';
-        rankings += '`' + rank.padEnd(4, ' ') + '` • `' + u.clash_count.toString().padStart(maxWidth, ' ') + '` • <@' + u.userId + '>\n';
-      }
-      embed.addFields({ name: '\u200b', value: rankings });
-      embed.setFooter({ text: 'Participants: ' + allClash.length + ' | Total Clashes: ' + totalClashes });
-    }
-    const back = new ButtonBuilder()
-      .setCustomId('back_to_drops_' + interaction.user.id + '_0')
-      .setLabel('Back')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('⬅️');
-    await interaction.update({ embeds: [embed], components: [new ActionRowBuilder().addComponents(back)] });
+    const allClash = await ClashCount.find({ guildId }).sort({ clash_count: -1 });
+    const embed = buildClashEmbed(interaction, allClash, 0);
+    const row = buildClashComponents(interaction, allClash, 0);
+    await interaction.update({ embeds: [embed], components: [row] });
   } catch (error) {
     await logError('Clash lb error', error);
     await interaction.update({ content: '❌ An error occurred.', embeds: [], components: [] });
   }
 }
 
-module.exports = { handleRlbCommand, handleRarityButton, handleClashButton, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset };
+async function handleClashPagination(interaction) {
+  if (!interaction.customId.startsWith('clash_prev_') && !interaction.customId.startsWith('clash_next_')) return false;
+  try {
+    const parts = interaction.customId.split('_');
+    const action = parts[1];
+    const currentPage = parseInt(parts[2]);
+    const perPage = 10;
+
+    const guildId = interaction.guild.id;
+    const allClash = await ClashCount.find({ guildId }).sort({ clash_count: -1 });
+    const totalPages = Math.ceil(allClash.length / perPage);
+
+    let newPage = currentPage;
+    if (action === 'next') newPage = Math.min(currentPage + 1, totalPages - 1);
+    if (action === 'prev') newPage = Math.max(currentPage - 1, 0);
+
+    const embed = buildClashEmbed(interaction, allClash, newPage);
+    const row = buildClashComponents(interaction, allClash, newPage);
+    await interaction.update({ embeds: [embed], components: [row] });
+    return true;
+  } catch (error) {
+    await logError('Clash pagination error', error);
+    await interaction.update({ content: '❌ An error occurred.', embeds: [], components: [] });
+    return true;
+  }
+}
+
+module.exports = { handleRlbCommand, handleRarityButton, handleClashButton, handleClashPagination, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset };
 
 
 async function handleRlbPagination(interaction) {
@@ -399,11 +451,6 @@ async function handleRlbPagination(interaction) {
   const action = parts[1];
   const userId = parts[2];
   const currentPage = parseInt(parts[3]);
-
-  if (interaction.user.id !== userId) {
-    await interaction.reply({ content: 'Dont click 😭', ephemeral: true });
-    return true;
-  }
 
   const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = interaction.user.id === BOT_OWNER_ID;

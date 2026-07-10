@@ -175,9 +175,13 @@ module.exports = {
                     return;
                 }
                 
-                const { handleRarityButton, handleClashButton, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset, handleRlbPagination } = require('../systems/leaderboard.system');
+                const { handleRarityButton, handleClashButton, handleClashPagination, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset, handleRlbPagination } = require('../systems/leaderboard.system');
                 if (interaction.customId.startsWith('rlb_')) {
                     await handleRlbPagination(interaction);
+                    return;
+                }
+                if (interaction.customId.startsWith('clash_prev_') || interaction.customId.startsWith('clash_next_')) {
+                    await handleClashPagination(interaction);
                     return;
                 }
                 if (interaction.customId.startsWith('view_clash_lb_')) {

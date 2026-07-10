@@ -324,4 +324,32 @@ module.exports = {
   logCritical,
   logDebug,
   silenceConsole,
+  // Query helpers for health endpoint
+  getRecentLogs: async (limit = 20) => {
+    if (Log) {
+      try {
+        return await Log.find({}).sort({ timestamp: -1 }).limit(limit).lean();
+      } catch (err) {
+        console.error('Failed to query recent logs:', err.message);
+      }
+    }
+    // Fallback to pending in-memory logs
+    return pendingLogs.slice(-limit).map(l => (typeof l === 'object' ? l : { message: String(l), timestamp: new Date() }));
+  },
+  getLatestError: async () => {
+    if (Log) {
+      try {
+        const doc = await Log.findOne({ level: { $in: ['ERROR', 'CRITICAL'] } }).sort({ timestamp: -1 }).lean();
+        return doc || null;
+      } catch (err) {
+        console.error('Failed to query latest error log:', err.message);
+      }
+    }
+    // Fallback search in pending logs
+    for (let i = pendingLogs.length - 1; i >= 0; i--) {
+      const l = pendingLogs[i];
+      if (l.level === 'ERROR' || l.level === 'CRITICAL') return l;
+    }
+    return null;
+  }
 };
