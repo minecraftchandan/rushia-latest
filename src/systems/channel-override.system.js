@@ -85,6 +85,38 @@ async function handleHereCommand(message) {
   }
 }
 
+async function handleUnhereCommand(message) {
+  const userId = message.author.id;
+
+  try {
+    const existingOverride = await ChannelOverride.getActiveOverride(userId);
+
+    if (!existingOverride) {
+      const reply = await message.reply('❌ You don\'t have an active channel override.');
+      setTimeout(() => {
+        reply.delete().catch(() => {});
+        message.delete().catch(() => {});
+      }, 10000);
+      return;
+    }
+
+    await ChannelOverride.removeOverride(userId);
+
+    const reply = await message.reply('✅ Channel override removed. Raid reminders will now be sent to the normal raid channel.');
+    setTimeout(() => {
+      reply.delete().catch(() => {});
+      message.delete().catch(() => {});
+    }, 10000);
+  } catch (error) {
+    const reply = await message.reply('❌ Failed to remove channel override. Please try again.');
+    setTimeout(() => {
+      reply.delete().catch(() => {});
+      message.delete().catch(() => {});
+    }, 10000);
+  }
+}
+
 module.exports = {
-  handleHereCommand
+  handleHereCommand,
+  handleUnhereCommand
 };

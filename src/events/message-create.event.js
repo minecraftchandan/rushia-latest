@@ -64,6 +64,12 @@ module.exports = {
                 return;
             }
             
+            if (content.match(/^unhere$/i)) {
+                const { handleUnhereCommand } = require('../systems/channel-override.system');
+                await handleUnhereCommand(message);
+                return;
+            }
+            
             if (content.match(/^logs$/i)) {
                 const { handleLogsCommand } = require('../commands/logs');
                 await handleLogsCommand(message);
@@ -218,6 +224,12 @@ module.exports = {
             if (command === 'here') {
                 const { handleHereCommand } = require('../systems/channel-override.system');
                 await handleHereCommand(message);
+                return;
+            }
+            
+            if (command === 'unhere') {
+                const { handleUnhereCommand } = require('../systems/channel-override.system');
+                await handleUnhereCommand(message);
                 return;
             }
             
