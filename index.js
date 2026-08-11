@@ -1,5 +1,14 @@
 require('dotenv').config();
 
+process.env.SILENCE_BOT_LOGS = 'true';
+if (process.env.SILENCE_BOT_LOGS === 'true') {
+  const noop = () => {};
+  console.log = noop;
+  console.info = noop;
+  console.warn = noop;
+  console.error = noop;
+}
+
 const { 
   Client, 
   GatewayIntentBits, 
@@ -18,6 +27,7 @@ const DatabaseManager = require('./src/database/database.manager');
 const { logInfo, logError, logCritical, sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
 const { createHealthServer } = require('./src/web/health.server');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
+const { spawn } = require('child_process');
 
 const client = new Client({
   intents: [
@@ -164,6 +174,17 @@ async function deployCommands(client) {
     console.log('📝 Initializing logs database...');
     await initializeLogsDB();
     console.log('✅ Logs database initialized');
+
+    const monitorProcess = spawn(process.execPath, [path.join(__dirname, 'tools', 'raid-reminder-monitor.js')], {
+      stdio: 'inherit',
+      env: { ...process.env, SILENCE_BOT_LOGS: 'false', FORCE_COLOR: '1' }
+    });
+
+    monitorProcess.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`⚠️ Raid reminder monitor exited with code ${code}`);
+      }
+    });
 
     // Start health HTTP server for deployment platform monitoring
     try {

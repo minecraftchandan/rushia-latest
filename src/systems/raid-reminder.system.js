@@ -46,7 +46,7 @@ async function processRaidMessage(message) {
     raidInfo = parseRaidViewComponent(message.components);
   }
 
-  if (!raidInfo && message.embeds.length > 0) {
+  if (!raidInfo && message.embeds?.length > 0) {
     raidInfo = parseRaidViewEmbed(message.embeds[0]);
   }
 
