@@ -128,10 +128,31 @@ async function checkReminders(client) {
             let failureReason = null;
             try {
               if (sendInDm) {
-                const user = await client.users.fetch(reminderData.userId);
-                if (user) {
-                  await user.send(reminderData.reminderMessage);
-                  sendSuccess = true;
+                try {
+                  const user = await client.users.fetch(reminderData.userId);
+                  if (user) {
+                    await user.send(reminderData.reminderMessage);
+                    sendSuccess = true;
+                  }
+                } catch (dmError) {
+                  // If DM is blocked (Discord 50007) or contains no mutual guilds, try channel fallback
+                  const dmBlocked = dmError && (dmError.code === 50007 || /no mutual guilds/i.test(dmError.message) || /cannot send messages to this user/i.test(dmError.message));
+                  if (dmBlocked) {
+                    try {
+                      const channel = await client.channels.fetch(reminderData.effectiveChannelId);
+                      if (channel) {
+                        await channel.send(reminderData.reminderMessage);
+                        sendSuccess = true;
+                        failureReason = 'dm_blocked_fallback_channel';
+                      } else {
+                        failureReason = dmError && (dmError.message || String(dmError));
+                      }
+                    } catch (chErr) {
+                      failureReason = `${dmError && (dmError.message || String(dmError))} | channel_fallback_failed: ${chErr && (chErr.message || String(chErr))}`;
+                    }
+                  } else {
+                    failureReason = dmError && (dmError.message || String(dmError));
+                  }
                 }
               } else {
                 const channel = await client.channels.fetch(reminderData.effectiveChannelId);
