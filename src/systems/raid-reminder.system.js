@@ -53,6 +53,9 @@ async function processRaidMessage(message) {
   if (!raidInfo) return false;
 
   for (const { userId, fatigueMillis } of raidInfo) {
+    // Ignore stale fatigue times under 30 seconds — embed was likely already old when parsed
+    if (fatigueMillis < 30 * 1000) continue;
+
     const existing = await checkExistingReminder(userId, 'raid');
     if (existing) continue;
     await createRaidReminder(userId, message.guild.id, message.guild.name, message.channel.id, fatigueMillis);

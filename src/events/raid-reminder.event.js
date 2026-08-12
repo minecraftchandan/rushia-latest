@@ -7,8 +7,16 @@ async function handleRaidReminder(message) {
     if (message.author.id !== LUVI_BOT_ID) return;
     if (!message.guild) return;
 
-    const hasRaidContent = Boolean(message.components?.length || message.embeds?.length);
-    if (!hasRaidContent) return;
+    // Only process messages that contain raid party/fatigue content
+    const hasRaidEmbed = message.embeds?.some(e =>
+        e.fields?.some(f => f.name?.includes('Party Members'))
+    );
+    const hasRaidComponent = message.components?.some(c =>
+        c.type === 17 && c.components?.some(ch =>
+            ch.type === 10 && ch.content?.includes('__Party Members__')
+        )
+    );
+    if (!hasRaidEmbed && !hasRaidComponent) return;
 
     const settings = await getSettings(message.guildId);
     if (!settings?.luviEnabled) return;
@@ -21,12 +29,6 @@ module.exports = [
         name: Events.MessageCreate,
         async execute(message) {
             await handleRaidReminder(message);
-        }
-    },
-    {
-        name: Events.MessageUpdate,
-        async execute(oldMessage, newMessage) {
-            await handleRaidReminder(newMessage);
         }
     }
 ];
