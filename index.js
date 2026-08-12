@@ -1,13 +1,5 @@
 require('dotenv').config();
 
-process.env.SILENCE_BOT_LOGS = 'true';
-if (process.env.SILENCE_BOT_LOGS === 'true') {
-  const noop = () => {};
-  console.log = noop;
-  console.info = noop;
-  console.warn = noop;
-  console.error = noop;
-}
 
 const { 
   Client, 
@@ -28,7 +20,6 @@ const { logInfo, logError, logCritical, sendLog, sendError, initializeLogsDB } =
 // Health server removed. Hourly reminder stats reporter will be used instead.
 const { startHourlyStats } = require('./src/tasks/hourly.reminder.stats');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
-const { spawn } = require('child_process');
 
 const client = new Client({
   intents: [
@@ -176,24 +167,6 @@ async function deployCommands(client) {
     await initializeLogsDB();
     console.log('✅ Logs database initialized');
 
-    const monitorProcess = spawn(process.execPath, [path.join(__dirname, 'tools', 'raid-reminder-monitor.js')], {
-      stdio: 'inherit',
-      env: { ...process.env, SILENCE_BOT_LOGS: 'false', FORCE_COLOR: '1' }
-    });
-
-    monitorProcess.on('exit', (code) => {
-      if (code !== 0) {
-        console.error(`⚠️ Raid reminder monitor exited with code ${code}`);
-      }
-    });
-
-    // Start hourly reminder stats reporter (DMs owner)
-    try {
-      startHourlyStats(readyClient).catch(() => {});
-    } catch (err) {
-      console.error('Failed to start hourly stats reporter:', err && err.message);
-    }
-    
     await deployCommands(client);
     
     setInterval(() => {
@@ -234,6 +207,11 @@ async function deployCommands(client) {
           reminderSchedulerStarted = true;
         }
         console.log('✅ Reminder scheduler started');
+
+        // Start hourly reminder stats reporter
+        try {
+          startHourlyStats(readyClient).catch(() => {});
+        } catch (err) {}
         
         console.log('📦 Initializing inventory helper...');
         handleCardInventorySystem(readyClient);
