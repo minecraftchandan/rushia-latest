@@ -1,5 +1,6 @@
 const Reminder = require('../database/reminder.model');
 const ChannelOverride = require('../database/channel-override.model');
+const ReminderFailure = require('../database/reminder.failure.model');
 const { getUserSettings } = require('../utils/user-settings.manager');
 const { SCHEDULER } = require('../config/constants');
 
@@ -124,6 +125,7 @@ async function checkReminders(client) {
           if (effectiveSendReminder) {
             let sendSuccess = false;
             
+            let failureReason = null;
             try {
               if (sendInDm) {
                 const user = await client.users.fetch(reminderData.userId);
@@ -134,24 +136,47 @@ async function checkReminders(client) {
               } else {
                 const channel = await client.channels.fetch(reminderData.effectiveChannelId);
                 if (channel) {
-                  const guild = channel.guild;
                   await channel.send(reminderData.reminderMessage);
                   sendSuccess = true;
                 }
               }
             } catch (innerError) {
               sendSuccess = false;
+              failureReason = innerError && (innerError.message || String(innerError));
             }
-            
+
             if (sendSuccess) {
               const markResult = await Reminder.markAsSent(reminderData.reminderIds);
               if (markResult.modifiedCount > 0) {
                 sentReminderIds.push(...reminderData.reminderIds);
               } else {
+                // markAsSent failed
                 failedReminderIds.push(...reminderData.reminderIds);
+                try {
+                  await ReminderFailure.insertMany(reminderData.reminderIds.map(id => ({
+                    reminderId: id,
+                    userId: reminderData.userId,
+                    guildId: reminderData.guildId,
+                    channelId: reminderData.effectiveChannelId || reminderData.channelId,
+                    type: reminderData.type,
+                    reason: 'markAsSent_failed',
+                    timestamp: new Date()
+                  })), { ordered: false });
+                } catch (e) {}
               }
             } else {
               failedReminderIds.push(...reminderData.reminderIds);
+              try {
+                await ReminderFailure.insertMany(reminderData.reminderIds.map(id => ({
+                  reminderId: id,
+                  userId: reminderData.userId,
+                  guildId: reminderData.guildId,
+                  channelId: reminderData.effectiveChannelId || reminderData.channelId,
+                  type: reminderData.type,
+                  reason: failureReason || 'send_failed',
+                  timestamp: new Date()
+                })), { ordered: false });
+              } catch (e) {}
             }
           } else {
             await Reminder.deleteMany({ _id: { $in: reminderData.reminderIds } });

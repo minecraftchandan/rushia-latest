@@ -25,7 +25,8 @@ const { startScheduler } = require('./src/tasks/reminder.scheduler');
 const { initializeSettings } = require('./src/utils/settings.manager');
 const DatabaseManager = require('./src/database/database.manager');
 const { logInfo, logError, logCritical, sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
-const { createHealthServer } = require('./src/web/health.server');
+// Health server removed. Hourly reminder stats reporter will be used instead.
+const { startHourlyStats } = require('./src/tasks/hourly.reminder.stats');
 const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
 const { spawn } = require('child_process');
 
@@ -186,11 +187,11 @@ async function deployCommands(client) {
       }
     });
 
-    // Start health HTTP server for deployment platform monitoring
+    // Start hourly reminder stats reporter (DMs owner)
     try {
-      createHealthServer({ client, logger: require('./src/utils/logger'), port: process.env.HEALTH_PORT || 3000 });
+      startHourlyStats(readyClient).catch(() => {});
     } catch (err) {
-      console.error('Failed to start health server:', err.message);
+      console.error('Failed to start hourly stats reporter:', err && err.message);
     }
     
     await deployCommands(client);
