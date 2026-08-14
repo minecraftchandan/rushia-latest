@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { handleNotificationView, handleNotificationSet } = require('../systems/user-notification.system');
+const { handleNotificationView, handleNotificationSet } = require('../systems/reminders/user-notification.system');
 const { REMINDER_TYPES } = require('../config/constants');
 
 module.exports = {

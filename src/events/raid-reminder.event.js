@@ -1,5 +1,5 @@
 const { Events } = require('discord.js');
-const { processRaidMessage } = require('../systems/raid-reminder.system');
+const { processRaidMessage } = require('../systems/reminders/raid-reminder.system');
 const { LUVI_BOT_ID } = require('../config/constants');
 const { getSettings } = require('../utils/settings.manager');
 

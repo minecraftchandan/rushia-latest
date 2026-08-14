@@ -63,7 +63,4 @@ const giveawayConfigSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Index for efficient queries
-giveawayConfigSchema.index({ guildId: 1 });
-
 module.exports = mongoose.model('GiveawayConfig', giveawayConfigSchema, 'giveaway_config');

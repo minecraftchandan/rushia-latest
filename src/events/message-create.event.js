@@ -1,17 +1,16 @@
 const { Events } = require('discord.js');
-const { processBossMessage } = require('../systems/tier-ping.system');
-const { processStaminaMessage } = require('../systems/stamina-reminder.system');
-const { processRaidSpawnMessage, processUserSpawnCommand } = require('../systems/raid-spawn-reminder.system');
-const { processRaidWishlist } = require('../systems/raid-wishlist.system');
-const { processDropMessage } = require('../systems/drop-reminder.system');
-const { processRarityDrop } = require('../systems/rarity-drop.system');
-const { processDropCount } = require('../systems/drop-count.system');
-const { processClashMessage } = require('../systems/clash-count.system');
-const { processInventoryMessage: processGeneratorMessage } = require('../systems/message-generator.system');
-const { processPogMessage } = require('../systems/pog.system');
-const { processSeriesMessage } = require('../systems/series.system');
+const { processBossMessage } = require('../systems/boss/tier-ping.system');
+const { processStaminaMessage } = require('../systems/reminders/stamina-reminder.system');
+const { processRaidSpawnMessage, processUserSpawnCommand } = require('../systems/reminders/raid-spawn-reminder.system');
+const { processRaidWishlist } = require('../systems/raid/raid-wishlist.system');
+const { processDropMessage } = require('../systems/reminders/drop-reminder.system');
+const { processRarityDrop } = require('../systems/leaderboard/rarity-drop.system');
+const { processDropCount } = require('../systems/leaderboard/drop-count.system');
+const { processClashMessage } = require('../systems/leaderboard/clash-count.system');
+const { processPogMessage } = require('../systems/boss/pog.system');
+const { processSeriesMessage } = require('../systems/cards/series.system');
 const { LUVI_BOT_ID, SOFI_BOT_ID } = require('../config/constants');
-const { addIdReaction } = require('../systems/id-fetch.system');
+const { addIdReaction } = require('../systems/cards/id-fetch.system');
 
 module.exports = {
     name: Events.MessageCreate,
@@ -29,7 +28,7 @@ module.exports = {
             // Wishlist add command: @Bot wa name or @Bot wa name1,name2,name3
             const waMatch = content.match(/^wa\s+(.+)$/i);
             if (waMatch) {
-                const { handleWishlistAdd } = require('../systems/wishlist.system');
+                const { handleWishlistAdd } = require('../systems/cards/wishlist.system');
                 await handleWishlistAdd(message, waMatch[1]);
                 return;
             }
@@ -37,7 +36,7 @@ module.exports = {
             // Wishlist view command: @Bot wl or @Bot wl @user or @Bot wl userId
             const wlMatch = content.match(/^wl(?:\s+(?:<@!?(\d+)>|(\d+)))?$/i);
             if (wlMatch) {
-                const { handleWishlistView } = require('../systems/wishlist.system');
+                const { handleWishlistView } = require('../systems/cards/wishlist.system');
                 const targetId = wlMatch[1] || wlMatch[2];
                 const targetUser = targetId ? await client.users.fetch(targetId).catch(() => null) : null;
                 await handleWishlistView(message, targetUser);
@@ -47,7 +46,7 @@ module.exports = {
             // Wishlist remove command: @Bot wr name or @Bot wr name1,name2,name3
             const wrMatch = content.match(/^wr\s+(.+)$/i);
             if (wrMatch) {
-                const { handleWishlistRemove } = require('../systems/wishlist.system');
+                const { handleWishlistRemove } = require('../systems/cards/wishlist.system');
                 await handleWishlistRemove(message, wrMatch[1]);
                 return;
             }
@@ -59,13 +58,13 @@ module.exports = {
             }
             
             if (content.match(/^here$/i)) {
-                const { handleHereCommand } = require('../systems/channel-override.system');
+                const { handleHereCommand } = require('../systems/raid/channel-override.system');
                 await handleHereCommand(message);
                 return;
             }
             
             if (content.match(/^unhere$/i)) {
-                const { handleUnhereCommand } = require('../systems/channel-override.system');
+                const { handleUnhereCommand } = require('../systems/raid/channel-override.system');
                 await handleUnhereCommand(message);
                 return;
             }
@@ -92,13 +91,13 @@ module.exports = {
             }
             
             if (content.match(/^nv(?:\s|$)/i)) {
-                const { handleNotificationViewCommand } = require('../systems/user-notification.system');
+                const { handleNotificationViewCommand } = require('../systems/reminders/user-notification.system');
                 await handleNotificationViewCommand(message);
                 return;
             }
             
             if (content.match(/^(?:servers|guilds)$/i)) {
-                const { handleServerListCommand } = require('../systems/server-management.system');
+                const { handleServerListCommand } = require('../systems/admin/server-management.system');
                 await handleServerListCommand(message);
                 return;
             }
@@ -133,21 +132,14 @@ module.exports = {
             // Handle info command with server ID
             const infoMatch = content.match(/^(info|i|in|inf)\s+(\d+)$/i);
             if (infoMatch) {
-                const { handleServerInfoCommand } = require('../systems/server-management.system');
+                const { handleServerInfoCommand } = require('../systems/admin/server-management.system');
                 await handleServerInfoCommand(message, infoMatch[2]);
                 return;
             }
             
             if (content.match(/^(?:rlb|lb)$/i)) {
-                const { handleRlbCommand } = require('../systems/leaderboard.system');
+                const { handleRlbCommand } = require('../systems/leaderboard/leaderboard.system');
                 await handleRlbCommand(message);
-                return;
-            }
-            
-            // Test command: @bot test
-            if (content.match(/^test$/i)) {
-                const { handleTestCommand } = require('../utils/test.simulator');
-                await handleTestCommand(message);
                 return;
             }
             
@@ -182,7 +174,7 @@ module.exports = {
             
             const match = content.match(/^(f|find)\s+(.+)$/i);
             if (match) {
-                const cardSearch = require('../systems/card-search.system');
+                const cardSearch = require('../systems/cards/card-search.system');
                 await cardSearch.handleSearch(message, match[2]);
                 return;
             }
@@ -195,13 +187,13 @@ module.exports = {
             
             // Wishlist commands
             if (command === 'wa' && args[1]) {
-                const { handleWishlistAdd } = require('../systems/wishlist.system');
+                const { handleWishlistAdd } = require('../systems/cards/wishlist.system');
                 await handleWishlistAdd(message, args.slice(1).join(' '));
                 return;
             }
             
             if (command === 'wl') {
-                const { handleWishlistView } = require('../systems/wishlist.system');
+                const { handleWishlistView } = require('../systems/cards/wishlist.system');
                 const targetId = args[1]?.replace(/[<@!>]/g, '');
                 const targetUser = targetId ? await client.users.fetch(targetId).catch(() => null) : null;
                 await handleWishlistView(message, targetUser);
@@ -209,7 +201,7 @@ module.exports = {
             }
             
             if (command === 'wr' && args[1]) {
-                const { handleWishlistRemove } = require('../systems/wishlist.system');
+                const { handleWishlistRemove } = require('../systems/cards/wishlist.system');
                 await handleWishlistRemove(message, args.slice(1).join(' '));
                 return;
             }
@@ -222,13 +214,13 @@ module.exports = {
             }
             
             if (command === 'here') {
-                const { handleHereCommand } = require('../systems/channel-override.system');
+                const { handleHereCommand } = require('../systems/raid/channel-override.system');
                 await handleHereCommand(message);
                 return;
             }
             
             if (command === 'unhere') {
-                const { handleUnhereCommand } = require('../systems/channel-override.system');
+                const { handleUnhereCommand } = require('../systems/raid/channel-override.system');
                 await handleUnhereCommand(message);
                 return;
             }
@@ -254,14 +246,14 @@ module.exports = {
             }
             
             if (command === 'nv') {
-                const { handleNotificationViewCommand } = require('../systems/user-notification.system');
+                const { handleNotificationViewCommand } = require('../systems/reminders/user-notification.system');
                 await handleNotificationViewCommand(message);
                 return;
             }
             
             // Server management
             if (command === 'servers' || command === 'guilds') {
-                const { handleServerListCommand } = require('../systems/server-management.system');
+                const { handleServerListCommand } = require('../systems/admin/server-management.system');
                 await handleServerListCommand(message);
                 return;
             }
@@ -291,22 +283,15 @@ module.exports = {
             }
             
             if ((command === 'info' || command === 'i' || command === 'in' || command === 'inf') && args[1]) {
-                const { handleServerInfoCommand } = require('../systems/server-management.system');
+                const { handleServerInfoCommand } = require('../systems/admin/server-management.system');
                 await handleServerInfoCommand(message, args[1]);
                 return;
             }
             
             // Leaderboard
             if (command === 'lb' || command === 'rlb') {
-                const { handleRlbCommand } = require('../systems/leaderboard.system');
+                const { handleRlbCommand } = require('../systems/leaderboard/leaderboard.system');
                 await handleRlbCommand(message);
-                return;
-            }
-            
-            // Test
-            if (command === 'test') {
-                const { handleTestCommand } = require('../utils/test.simulator');
-                await handleTestCommand(message);
                 return;
             }
             
@@ -325,7 +310,7 @@ module.exports = {
             
             // Card search
             if ((command === 'f' || command === 'find') && args[1]) {
-                const cardSearch = require('../systems/card-search.system');
+                const cardSearch = require('../systems/cards/card-search.system');
                 await cardSearch.handleSearch(message, args.slice(1).join(' '));
                 return;
             }
@@ -333,11 +318,11 @@ module.exports = {
         
         // Handle card search number selection
         if (!message.author.bot && message.content.match(/^\d+$/)) {
-            const { handleWishlistSelection } = require('../systems/wishlist.system');
+            const { handleWishlistSelection } = require('../systems/cards/wishlist.system');
             const handled = await handleWishlistSelection(message, message.content);
             if (handled) return;
             
-            const cardSearch = require('../systems/card-search.system');
+            const cardSearch = require('../systems/cards/card-search.system');
             const searchHandled = await cardSearch.handleSelection(message);
             if (searchHandled) return;
         }
@@ -364,11 +349,10 @@ module.exports = {
         await processDropCount(message);
         await processClashMessage(message);
         await processBossMessage(message);
-        await processGeneratorMessage(message);
         await addIdReaction(message);
         
         // Track giveaway tasks
-        const { processGiveawayTracking } = require('../systems/giveaway-tracker.system');
+        const { processGiveawayTracking } = require('../systems/giveaway/giveaway-tracker.system');
         await processGiveawayTracking(message);
     }
 };

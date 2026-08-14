@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const giveawaySchema = new mongoose.Schema({
-  guildId: { type: String, required: true, index: true },
-  userId: { type: String, required: true, index: true },
+  guildId: { type: String, required: true },
+  userId: { type: String, required: true },
   username: { type: String, required: true },
-  taskType: { type: String, required: true, enum: ['drop', 'clash', 'daily_quests'], index: true },
+  taskType: { type: String, required: true, enum: ['drop', 'clash', 'daily_quests'] },
   currentCount: { type: Number, default: 0 },
   targetCount: { type: Number, required: true },
   roleId: { type: String, required: true },
-  completed: { type: Boolean, default: false, index: true },
+  completed: { type: Boolean, default: false },
   completedAt: { type: Date },
   lastTrackedAt: { type: Date }
 }, { timestamps: true });

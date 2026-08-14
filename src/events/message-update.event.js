@@ -1,9 +1,9 @@
 const { Events } = require('discord.js');
-const { processExpeditionMessage } = require('../systems/expedition-reminder.system');
-const { processRaidSpawnMessage } = require('../systems/raid-spawn-reminder.system');
-const { processRaidWishlist } = require('../systems/raid-wishlist.system');
-const { addIdReaction } = require('../systems/id-fetch.system');
-const { processClashMessage } = require('../systems/clash-count.system');
+const { processExpeditionMessage } = require('../systems/reminders/expedition-reminder.system');
+const { processRaidSpawnMessage } = require('../systems/reminders/raid-spawn-reminder.system');
+const { processRaidWishlist } = require('../systems/raid/raid-wishlist.system');
+const { addIdReaction } = require('../systems/cards/id-fetch.system');
+const { processClashMessage } = require('../systems/leaderboard/clash-count.system');
 const { LUVI_BOT_ID } = require('../config/constants');
 
 module.exports = {
