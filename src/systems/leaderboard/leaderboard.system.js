@@ -3,9 +3,9 @@ const { logInfo, logError } = require('../../utils/logger');
 const Drops = require('../../database/drops.model');
 const RarityDrop = require('../../database/rarity-drop.model');
 const ClashCount = require('../../database/clash-count.model');
+const { BOT_OWNER_ID } = require('../../config/constants');
 
 async function handleRlbCommand(message) {
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = message.author.id === BOT_OWNER_ID;
   const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
 
@@ -185,7 +185,6 @@ async function handleBackButton(interaction) {
       return interaction.reply({ content: 'Dont click 😭', ephemeral: true });
     }
 
-    const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
     const isOwner = interaction.user.id === BOT_OWNER_ID;
     const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
@@ -260,7 +259,6 @@ async function handleResetButton(interaction) {
       return interaction.reply({ content: 'Dont click 😭', ephemeral: true });
     }
 
-    const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
     if (interaction.user.id !== BOT_OWNER_ID && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({ content: '❌ Only the bot owner or server administrators can reset the leaderboard.', ephemeral: true });
     }
@@ -465,7 +463,6 @@ async function handleRlbPagination(interaction) {
   const userId = parts[2];
   const currentPage = parseInt(parts[3]);
 
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = interaction.user.id === BOT_OWNER_ID;
   const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 

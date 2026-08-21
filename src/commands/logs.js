@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const mongoose = require('mongoose');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 // Define Log schema if not already defined
 let Log;
@@ -24,7 +25,7 @@ const logSessions = new Map();
 
 async function handleLogsCommand(message) {
   // Check if user is bot owner
-  if (message.author.id !== process.env.BOT_OWNER_ID) {
+  if (message.author.id !== BOT_OWNER_ID) {
     return message.reply('Only the bot owner can view logs.');
   }
 
@@ -80,7 +81,7 @@ module.exports = {
 
   async execute(interaction) {
     // Check if user is bot owner
-    if (interaction.user.id !== process.env.BOT_OWNER_ID) {
+    if (interaction.user.id !== BOT_OWNER_ID) {
       return interaction.reply({ content: 'Only the bot owner can view logs.', ephemeral: true });
     }
 

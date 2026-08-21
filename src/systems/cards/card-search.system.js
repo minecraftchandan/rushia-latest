@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Load cards data
-const cardsPath = path.join(__dirname, '..', '..', 'data', 'cards.json');
+const cardsPath = path.join(__dirname, '..', '..', '..', 'data', 'cards.json');
 let cards = [];
 try {
   cards = JSON.parse(fs.readFileSync(cardsPath, 'utf8'));

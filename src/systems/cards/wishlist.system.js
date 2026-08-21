@@ -4,6 +4,7 @@ const { EmbedBuilder } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
 const { searchCards } = require('./advanced-search.system');
+const { BOT_OWNER_ID } = require('../../config/constants');
 
 let cardsCache = null;
 let wishlistConn = null;
@@ -26,7 +27,7 @@ const ELEMENT_EMOJIS = {
 
 function getCards() {
   if (!cardsCache) {
-    const cardsPath = path.join(__dirname, '..', '..', 'data', 'cards.json');
+    const cardsPath = path.join(__dirname, '..', '..', '..', 'data', 'cards.json');
     cardsCache = JSON.parse(fs.readFileSync(cardsPath, 'utf8'));
   }
   return cardsCache;
@@ -227,7 +228,7 @@ async function handleWishlistView(message, targetUser = null) {
   let loadingMsg = null;
   try {
     const userId = targetUser?.id || message.author.id;
-    const isOwner = message.author.id === process.env.BOT_OWNER_ID;
+    const isOwner = message.author.id === BOT_OWNER_ID;
     
     let wishlist = getCachedWishlist(userId);
     

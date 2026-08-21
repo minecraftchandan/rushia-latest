@@ -1,14 +1,5 @@
 require('dotenv').config();
 
-process.env.SILENCE_BOT_LOGS = 'true';
-if (process.env.SILENCE_BOT_LOGS === 'true') {
-  const noop = () => {};
-  console.log = noop;
-  console.info = noop;
-  console.warn = noop;
-  console.error = noop;
-}
-
 const { 
   Client, 
   GatewayIntentBits, 
@@ -25,9 +16,7 @@ const { startScheduler } = require('./src/tasks/reminder.scheduler');
 const { initializeSettings } = require('./src/utils/settings.manager');
 const DatabaseManager = require('./src/database/database.manager');
 const { logInfo, logError, logCritical, sendLog, sendError, initializeLogsDB } = require('./src/utils/logger');
-// Health server removed. Hourly reminder stats reporter will be used instead.
-const { startHourlyStats } = require('./src/tasks/hourly.reminder.stats');
-const { handleCardInventorySystem } = require('./src/systems/cardInventorySystem');
+const { handleCardInventorySystem } = require('./src/systems/cards/card-inventory.system');
 
 const client = new Client({
   intents: [
@@ -69,8 +58,6 @@ for (const file of eventFiles) {
     }
 }
 
-const { handleGeneratorReaction } = require('./src/systems/message-generator.system');
-
 let reminderSchedulerStarted = false;
 
 client.on(Events.ShardDisconnect, async () => {
@@ -84,11 +71,6 @@ client.on(Events.ShardDisconnect, async () => {
 
 client.on(Events.Error, (error) => {
   logError('[CLIENT ERROR]', error, { category: 'SYSTEM' }).catch(() => {});
-});
-
-client.on(Events.MessageReactionAdd, async (reaction, user) => {
-  await handleGeneratorReaction(reaction, user);
-  client.lastEventAt = Date.now();
 });
 
 client.on(Events.MessageCreate, async (message) => {
@@ -193,9 +175,6 @@ async function deployCommands(client) {
         await initializeSettings();
         console.log('✅ Settings cache initialized');
 
-        // Start hourly reminder stats reporter after Discord is ready.
-        startHourlyStats(readyClient).catch(() => {});
-        
         console.log('⏰ Starting reminder scheduler...');
         const Reminder = require('./src/database/reminder.model');
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);

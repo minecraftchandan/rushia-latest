@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -32,11 +33,11 @@ module.exports = {
 
     try {
       // Get bot owner
-      const owner = await interaction.client.users.fetch(process.env.BOT_OWNER_ID);
+      const owner = await interaction.client.users.fetch(BOT_OWNER_ID);
       
       // Send DM to owner
       await owner.send({
-        content: `<@${process.env.BOT_OWNER_ID}> New suggestion from <@${user.id}>`,
+        content: `<@${BOT_OWNER_ID}> New suggestion from <@${user.id}>`,
         embeds: [suggestionEmbed]
       });
 

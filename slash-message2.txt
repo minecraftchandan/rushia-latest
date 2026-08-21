@@ -1,0 +1,260 @@
+Interaction metadata:
+{
+  "interactionMetadata": {
+    "id": "1540210055360684062",
+    "type": 2,
+    "user": {
+      "id": "587709425708695552",
+      "bot": false,
+      "system": false,
+      "flags": 64,
+      "username": "diablo8246",
+      "globalName": "NOT [MOD]",
+      "discriminator": "0",
+      "avatar": "7853ae493c9b6d0599899f6779602628",
+      "banner": null,
+      "accentColor": null,
+      "avatarDecoration": null,
+      "avatarDecorationData": {
+        "asset": "a_70fddceac8bedb9bb317d6891e5521cd",
+        "skuId": "1366494385650274315"
+      },
+      "collectibles": {
+        "nameplate": {
+          "skuId": "1349849614286585866",
+          "asset": "nameplates/nameplates/cityscape/",
+          "label": "COLLECTIBLES_NAMEPLATES_CITYSCAPE_A11Y",
+          "palette": "violet"
+        }
+      },
+      "primaryGuild": null,
+      "createdTimestamp": 1560191246202,
+      "defaultAvatarURL": "https://cdn.discordapp.com/embed/avatars/0.png",
+      "hexAccentColor": null,
+      "tag": "diablo8246",
+      "avatarURL": "https://cdn.discordapp.com/avatars/587709425708695552/7853ae493c9b6d0599899f6779602628.webp",
+      "displayAvatarURL": "https://cdn.discordapp.com/avatars/587709425708695552/7853ae493c9b6d0599899f6779602628.webp",
+      "bannerURL": null,
+      "guildTagBadgeURL": null
+    },
+    "authorizingIntegrationOwners": {
+      "0": "597328712257503233",
+      "1": "587709425708695552"
+    },
+    "originalResponseMessageId": null,
+    "interactedMessageId": null,
+    "triggeringInteractionMetadata": null
+  },
+  "interaction": {
+    "id": "1540210055360684062",
+    "type": 2,
+    "commandName": "raid view",
+    "user": {
+      "id": "587709425708695552",
+      "bot": false,
+      "system": false,
+      "flags": 64,
+      "username": "diablo8246",
+      "globalName": "NOT [MOD]",
+      "discriminator": "0",
+      "avatar": "7853ae493c9b6d0599899f6779602628",
+      "banner": null,
+      "accentColor": null,
+      "avatarDecoration": null,
+      "avatarDecorationData": {
+        "asset": "a_70fddceac8bedb9bb317d6891e5521cd",
+        "skuId": "1366494385650274315"
+      },
+      "collectibles": {
+        "nameplate": {
+          "skuId": "1349849614286585866",
+          "asset": "nameplates/nameplates/cityscape/",
+          "label": "COLLECTIBLES_NAMEPLATES_CITYSCAPE_A11Y",
+          "palette": "violet"
+        }
+      },
+      "primaryGuild": null,
+      "createdTimestamp": 1560191246202,
+      "defaultAvatarURL": "https://cdn.discordapp.com/embed/avatars/0.png",
+      "hexAccentColor": null,
+      "tag": "diablo8246",
+      "avatarURL": "https://cdn.discordapp.com/avatars/587709425708695552/7853ae493c9b6d0599899f6779602628.webp",
+      "displayAvatarURL": "https://cdn.discordapp.com/avatars/587709425708695552/7853ae493c9b6d0599899f6779602628.webp",
+      "bannerURL": null,
+      "guildTagBadgeURL": null
+    }
+  }
+}
+
+Detected raid data:
+{
+  "raidId": "3459536",
+  "elementsText": "<:LU_GroundElement:1368398224724987904> **Ground** | <:LU_AirElement:1368398165501284433> **Air**",
+  "elementEmojis": [
+    {
+      "name": "LU_GroundElement",
+      "id": "1368398224724987904"
+    },
+    {
+      "name": "LU_AirElement",
+      "id": "1368398165501284433"
+    },
+    {
+      "name": "LU_HP",
+      "id": "1368399211481006151"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_PurpleBar",
+      "id": "1368403218442358866"
+    },
+    {
+      "name": "LU_GroundElement",
+      "id": "1368398224724987904"
+    },
+    {
+      "name": "LU_AirElement",
+      "id": "1368398165501284433"
+    },
+    {
+      "name": "LU_RetaliatingArmor",
+      "id": "1404630526475763712"
+    },
+    {
+      "name": "LU_OverchargedStrike",
+      "id": "1404630518753919140"
+    },
+    {
+      "name": "LU_Gold",
+      "id": "1368396297085911221"
+    },
+    {
+      "name": "LU_GroundElement",
+      "id": "1368398224724987904"
+    },
+    {
+      "name": "LU_AirElement",
+      "id": "1368398165501284433"
+    },
+    {
+      "name": "LU_XP",
+      "id": "1368396311971237970"
+    },
+    {
+      "name": "LU_R",
+      "id": "1368396991687557150"
+    },
+    {
+      "name": "LU_E",
+      "id": "1368396998348116071"
+    },
+    {
+      "name": "LU_L",
+      "id": "1368397008934797353"
+    },
+    {
+      "name": "LU_Cores",
+      "id": "1368396276571574414"
+    },
+    {
+      "name": "LU_EtherealCore",
+      "id": "1388771700291665930"
+    },
+    {
+      "name": "LU_Attunement",
+      "id": "1481859918691827712"
+    }
+  ],
+  "mentionedUserIds": [
+    "587709425708695552"
+  ],
+  "partyMemberUserIds": [
+    "587709425708695552"
+  ]
+}
+
+Embed 1
+Title: Mirko & Lubbock [Elite T4] <:LU_GroundElement:1368398224724987904><:LU_AirElement:1368398165501284433>
+Description: Waiting for the raid leader to begin the raid...
+Color: 16766720
+Fields:
+  1. name="<:LU_HP:1368399211481006151> **[8,543,233/8,543,233]** - Mirko & Lubbock [Elite T4]" inline=false
+     value="<:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866><:LU_PurpleBar:1368403218442358866> **100.0%**\nElements: <:LU_GroundElement:1368398224724987904> **Ground** | <:LU_AirElement:1368398165501284433> **Air**"
+  2. name="__Abilities__" inline=false
+     value="-# **Mirko**: <:LU_RetaliatingArmor:1404630526475763712> **Retaliating Armor**: Reflects 25% of damage taken back to all attackers\n-# **Lubbock**: <:LU_OverchargedStrike:1404630518753919140> **Overcharged Strike**: Every 4th turn, deal double damage for that turn."
+  3. name="__Raid Modifier__" inline=false
+     value="⚠️ *Boss attacks cannot be dodged.*"
+  4. name="__Party Members (1/5)__" inline=false
+     value="1. 👑 <@587709425708695552> Party Leader"
+  5. name="__Total Rewards__" inline=false
+     value="<:LU_Gold:1368396297085911221> **87,797** Gold each\n<:LU_GroundElement:1368398224724987904> **419 Ground Essence** + <:LU_AirElement:1368398165501284433> **419 Air Essence** each\n<:LU_XP:1368396311971237970> **12,500** XP each\n<:LU_R:1368396991687557150><:LU_E:1368396998348116071><:LU_L:1368397008934797353> **Mirko / Lubbock** Card (**100% / 100% / 25%**) per player\n<:LU_Cores:1368396276571574414> 1 Core (**50%**) - guaranteed core for top damage dealer\n<:LU_EtherealCore:1388771700291665930> 1 Ethereal Core (**8%**)\n<:LU_Attunement:1481859918691827712> 1 Attunement Material (**30%**)"
+Image: https://cdn.discordapp.com/attachments/1363072720027521175/1540210067066847252/Mirko__Lubbock_boss.png?ex=6a891fe7&is=6a87ce67&hm=1886c50bed4b346b8137a8306051bd11440db22055784e4009eb7204a587a653&
+Footer: ID: 3459536 - 59m remaining
+
+Components JSON:
+[
+  {
+    "type": 1,
+    "id": 1,
+    "components": [
+      {
+        "type": 2,
+        "id": 2,
+        "custom_id": "eeb209b48da80552627ed257e4785188",
+        "style": 1,
+        "label": "Raid Help"
+      }
+    ]
+  }
+]

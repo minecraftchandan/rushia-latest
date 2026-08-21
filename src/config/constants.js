@@ -28,6 +28,21 @@ module.exports = {
   },
   
   TIERS: ['t1', 't2', 't3', 't4'],
+
+  RAID_PING_COOLDOWN_SECONDS: 30 * 60,
+
+  RAID_ELEMENT_EMOJIS: [
+    { key: 'light', emojiName: 'LU_LightElement', aliases: ['light'] },
+    { key: 'dark', emojiName: 'LU_DarkElement', aliases: ['dark'] },
+    { key: 'ground', emojiName: 'LU_GroundElement', aliases: ['ground'] },
+    { key: 'fire', emojiName: 'LU_FireElement', aliases: ['fire'] },
+    { key: 'water', emojiName: 'LU_WaterElement', aliases: ['water'] },
+    { key: 'air', emojiName: 'LU_AirElement', aliases: ['air'] },
+    { key: 'neutral', emojiName: 'LU_NeutralElement', aliases: ['neutral', 'normal'] },
+    { key: 'grass', emojiName: 'LU_GrassElement', aliases: ['grass'] },
+    { key: 'ice', emojiName: 'LU_IceElement', aliases: ['ice'] },
+    { key: 'electric', emojiName: 'LU_ElectricElement', aliases: ['electric'] }
+  ],
   
   REMINDER_TYPES: ['expedition', 'stamina', 'raid', 'raidSpawn', 'drop'],
   

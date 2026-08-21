@@ -1,7 +1,8 @@
 const { PermissionsBitField, EmbedBuilder } = require('discord.js');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 async function handlePermsCheck(message) {
-    if (message.author.id !== process.env.BOT_OWNER_ID) {
+    if (message.author.id !== BOT_OWNER_ID) {
         return;
     }
 

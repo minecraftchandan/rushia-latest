@@ -154,7 +154,9 @@ async function saveLogToDB(logEntry) {
     'COMMAND_EXECUTE',
     'SCHEDULER_EVENT',
     'BOT_LIFECYCLE',
-    'CACHE_REFRESH'
+    'CACHE_REFRESH',
+    'REMINDER',
+    'RAID_PING'
   ];
   
   const saveToDbLevels = ['CRITICAL', 'ERROR'];
@@ -256,18 +258,24 @@ async function logInfo(message, options = {}) {
   const entry = {
     level: 'INFO',
     message,
+    operation: options.category || 'INFO',
+    action: options.action || 'INFO',
     ...options,
   };
   await saveLogToDB(entry);
+  console.info(`[INFO] ${message}`, options.metadata || '');
 }
 
 async function logWarn(message, options = {}) {
   const entry = {
     level: 'WARN',
     message,
+    operation: options.category || 'WARN',
+    action: options.action || 'WARN',
     ...options,
   };
   await saveLogToDB(entry);
+  console.warn(`[WARN] ${message}`, options.metadata || '');
 }
 
 async function logError(message, error, options = {}) {
@@ -278,9 +286,12 @@ async function logError(message, error, options = {}) {
     errorCode: error?.code,
     errorMessage: error?.message,
     tags: ['error', ...(options.tags || [])],
+    operation: options.category || 'ERROR',
+    action: options.action || 'ERROR',
     ...options,
   };
   await saveLogToDB(entry);
+  console.error(`[ERROR] ${message}`, error?.message || '');
 }
 
 async function logCritical(message, error, options = {}) {
@@ -291,9 +302,12 @@ async function logCritical(message, error, options = {}) {
     errorCode: error?.code,
     errorMessage: error?.message,
     tags: ['critical', ...(options.tags || [])],
+    operation: options.category || 'CRITICAL',
+    action: options.action || 'CRITICAL',
     ...options,
   };
   await saveLogToDB(entry);
+  console.error(`[CRITICAL] ${message}`, error?.message || '');
 }
 
 async function logDebug(message, options = {}) {

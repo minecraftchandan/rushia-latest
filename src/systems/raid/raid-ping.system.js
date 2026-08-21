@@ -1,12 +1,201 @@
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { BOT_OWNER_ID, LUVI_BOT_ID, RAID_ELEMENT_EMOJIS, RAID_PING_COOLDOWN_SECONDS } = require('../../config/constants');
+
+function logRaidDecision(message, decision, metadata = {}) {
+  const details = { messageId: message.id, channelId: message.channel?.id, ...metadata };
+  console.log(`[RAID_PING] ${decision}`, details);
+}
+
+const pendingRaidTriggers = new Map();
+const RAID_TRIGGER_TTL_MS = 10 * 1000;
+const announcedRaidMessages = new Map();
+const ANNOUNCEMENT_DEDUPE_MS = 35 * 1000;
+const pendingRaidFetches = new Set();
+
+function trackRaidTrigger(message) {
+  if (message.author?.bot || !message.guild || !message.mentions?.users?.has(LUVI_BOT_ID)) return false;
+  if (!/\braid(?:\s+view)?\b/i.test(message.content || '')) return false;
+
+  pendingRaidTriggers.set(message.channel.id, {
+    userId: message.author.id,
+    expiresAt: Date.now() + RAID_TRIGGER_TTL_MS
+  });
+  return true;
+}
+
+function extractRaidId(message) {
+  for (const embed of message.embeds || []) {
+    const match = (embed.footer?.text || '').match(/\bID:\s*(\d+)/i);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function extractPartyLeaderId(message) {
+  for (const embed of message.embeds || []) {
+    const partyField = (embed.fields || []).find(field => /party members/i.test(field.name || ''));
+    const leaderMatch = partyField?.value?.match(/<@!?(\d+)>[^\n]*Party Leader/i);
+    if (leaderMatch) return leaderMatch[1];
+  }
+  return null;
+}
+
+function extractTriggerUserId(message) {
+  const interactionUserId = message.interactionMetadata?.user?.id ||
+    message.interactionMetadata?.userId ||
+    message.interaction?.user?.id ||
+    message.interaction?.userId;
+  if (interactionUserId) return interactionUserId;
+
+  const pending = pendingRaidTriggers.get(message.channel?.id);
+  if (!pending) return null;
+  if (pending.expiresAt < Date.now()) {
+    pendingRaidTriggers.delete(message.channel.id);
+    return null;
+  }
+  pendingRaidTriggers.delete(message.channel.id);
+  return pending.userId;
+}
+
+function extractLeaderId(message) {
+  return extractPartyLeaderId(message) || extractTriggerUserId(message);
+}
+
 function extractElements(embed) {
   if (!embed) return [];
 
-  const text = [embed.title, embed.description, ...(embed.fields || []).flatMap(field => [field.name, field.value])]
+  const fields = embed.fields || [];
+  const elementsField = fields.find(field => /elements/i.test(`${field.name || ''} ${field.value || ''}`));
+  const text = [embed.title, embed.description, elementsField?.value, elementsField?.name]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-  const elements = ['light', 'dark', 'earth', 'fire', 'water', 'air', 'normal', 'grass', 'ice', 'electric'];
-  return [...new Set(elements.filter(element => new RegExp(`\\b${element}\\b`, 'i').test(text)))];
+  const emojiNames = new Set(
+    [...text.matchAll(/<:([^:>]+):\d+>/g)].map(match => match[1])
+  );
+
+  return RAID_ELEMENT_EMOJIS
+    .filter(element => emojiNames.has(element.emojiName) ||
+      element.aliases.some(alias => new RegExp(`\\b${alias}\\b`, 'i').test(text)))
+    .map(element => element.key);
+}
+
+function isRaidEmbed(message) {
+  return message.embeds?.some(embed => {
+    const hasPartyMembers = (embed.fields || []).some(field => /party members/i.test(field.name || ''));
+    const hasElements = (embed.fields || []).some(field => /elements/i.test(`${field.name || ''} ${field.value || ''}`));
+    const hasRaidId = /\bID:\s*\d+/i.test(embed.footer?.text || '');
+    const isWaitingToStart = /waiting for the raid leader to begin the raid/i.test(embed.description || '');
+    return hasPartyMembers && hasElements && hasRaidId && isWaitingToStart;
+  });
+}
+
+async function handleRaidPingMessage(message) {
+  if (!message.guild || message.author?.id !== LUVI_BOT_ID) return false;
+  if (!message.embeds?.length) {
+    if (pendingRaidFetches.has(message.id)) return false;
+    pendingRaidFetches.add(message.id);
+    setTimeout(async () => {
+      try {
+        const fetchedMessage = await message.channel.messages.fetch(message.id);
+        await handleRaidPingMessage(fetchedMessage);
+      } catch (error) {
+        console.error('[RAID_PING] DEFERRED_FETCH_FAILED', { messageId: message.id, error: error.message });
+      } finally {
+        pendingRaidFetches.delete(message.id);
+      }
+    }, 1000);
+    return false;
+  }
+  if (!isRaidEmbed(message)) {
+    await logRaidDecision(message, 'SKIPPED_NOT_RAID_EMBED', { embedCount: message.embeds.length });
+    return false;
+  }
+
+  const { GuildRoles } = require('../../database/raid-ping.model');
+  const guildRoles = await GuildRoles.findForGuild(message.guild.id);
+  if (!guildRoles) {
+    await logRaidDecision(message, 'SKIPPED_NO_ROLE_CONFIGURATION', { guildId: message.guild.id });
+    return false;
+  }
+  const triggerUserId = extractTriggerUserId(message);
+  const leaderId = extractPartyLeaderId(message) || triggerUserId;
+  const raidId = extractRaidId(message);
+  const raidElements = message.embeds.flatMap(extractElements);
+  await logRaidDecision(message, 'CHECK', {
+    triggerUserId,
+    leaderId,
+    raidId,
+    raidElements,
+    hasInteractionMetadata: Boolean(message.interactionMetadata),
+    hasInteraction: Boolean(message.interaction)
+  });
+  if (!triggerUserId) {
+    await logRaidDecision(message, 'SKIPPED_NO_TRIGGER_USER', { leaderId });
+    return false;
+  }
+  if (!leaderId || triggerUserId !== leaderId) {
+    await logRaidDecision(message, 'SKIPPED_TRIGGER_NOT_LEADER', { triggerUserId, leaderId });
+    return false;
+  }
+
+  if (!raidId || raidElements.length === 0) {
+    await logRaidDecision(message, 'SKIPPED_MISSING_RAID_DATA', { raidId, raidElements });
+    return false;
+  }
+
+  const announcedAt = announcedRaidMessages.get(message.id);
+  if (announcedAt && Date.now() - announcedAt < ANNOUNCEMENT_DEDUPE_MS) {
+    await logRaidDecision(message, 'SKIPPED_DUPLICATE_EVENT', { raidId });
+    return false;
+  }
+
+  const roles = raidElements
+    .map(element => ({
+      element,
+      roleId: guildRoles.roles?.[element] || (element === 'neutral' ? guildRoles.roles?.normal : null)
+    }))
+    .filter(item => item.roleId);
+  if (roles.length === 0) {
+    await logRaidDecision(message, 'SKIPPED_NO_MATCHING_ROLES', { raidId, raidElements, configuredRoles: guildRoles.roles || {} });
+    return false;
+  }
+
+  const roleMentions = roles.map(item => `<@&${item.roleId}>`);
+  const elementRoleLines = roleMentions.join('\n');
+  const announcement = new EmbedBuilder()
+    .setTitle('Raid elements found')
+    .addFields(
+      { name: 'Elements found', value: elementRoleLines },
+      { name: '\u200b', value: 'Tap below to summon help.' }
+    )
+    .setColor(0x3498db)
+    .setFooter({ text: `Raid ID: ${raidId}` });
+  const summonButton = new ButtonBuilder()
+    .setCustomId(`raid_summon_${raidId}_${message.id}`)
+    .setLabel('Summon')
+    .setStyle(ButtonStyle.Primary);
+
+  announcedRaidMessages.set(message.id, Date.now());
+  let announcementMessage;
+  try {
+    announcementMessage = await message.channel.send({
+      content: `<@${leaderId}>`,
+      embeds: [announcement],
+      components: [new ActionRowBuilder().addComponents(summonButton)],
+      allowedMentions: { users: [leaderId], roles: [] }
+    });
+
+    setTimeout(() => {
+      announcedRaidMessages.delete(message.id);
+      announcementMessage.delete().catch(() => {});
+    }, 30 * 1000);
+  } catch (error) {
+    announcedRaidMessages.delete(message.id);
+    throw error;
+  }
+  await logRaidDecision(message, 'ANNOUNCEMENT_SENT', { raidId, triggerUserId, leaderId, raidElements, roleIds: roles.map(role => role.roleId), announcementId: announcementMessage.id });
+  return true;
 }
 
 async function validateAndPingRoles(raidElements, guildRoles, channel) {
@@ -14,7 +203,7 @@ async function validateAndPingRoles(raidElements, guildRoles, channel) {
   const roleMentions = [];
 
   for (const element of raidElements) {
-    const roleId = guildRoles?.roles?.[element];
+    const roleId = guildRoles?.roles?.[element] || (element === 'neutral' ? guildRoles?.roles?.normal : null);
     if (!roleId) {
       missingRoles.push(element);
       continue;
@@ -39,31 +228,124 @@ async function validateAndPingRoles(raidElements, guildRoles, channel) {
   return { sent: roleMentions, missing: missingRoles };
 }
 
-async function handleRaidPingMessage(message) {
-  if (!message.guild || message.author?.bot !== true || !message.embeds?.length) return false;
+async function handleRaidPingReaction(reaction, user) {
+  const message = reaction.message;
+  if (user.bot || reaction.emoji.name !== '🔔' || !message.guild || message.author?.id !== LUVI_BOT_ID) return false;
+
+  const { GuildRoles } = require('../../database/raid-ping.model');
+  const guildRoles = await GuildRoles.findForGuild(message.guild.id);
+  if (!guildRoles || !isRaidEmbed(message)) return false;
 
   const raidElements = message.embeds.flatMap(extractElements);
   if (raidElements.length === 0) return false;
 
-  const { GuildRoles } = require('../../database/raid-ping.model');
-  const guildRoles = await GuildRoles.findOne({ guildId: message.guild.id }).lean();
-  if (!guildRoles) return false;
+  const raidId = extractRaidId(message);
+  if (!raidId) return false;
 
-  const result = await validateAndPingRoles(raidElements, guildRoles, message.channel);
-  if (result.sent.length === 0) return false;
+  const { Raid } = require('../../database/raid-ping.model');
+  try {
+    await Raid.create({ raidId, elements: raidElements });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existingRaid = await Raid.findOne({ raidId }).lean();
+      const expiresAt = existingRaid
+        ? new Date(new Date(existingRaid.createdAt).getTime() + RAID_PING_COOLDOWN_SECONDS * 1000)
+        : new Date(Date.now() + RAID_PING_COOLDOWN_SECONDS * 1000);
+      const remainingSeconds = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000));
+      const remainingMinutes = Math.ceil(remainingSeconds / 60);
+      await message.channel.send({
+        content: `<@${user.id}> This raid was already pinged. You can ping it again <t:${Math.floor(expiresAt.getTime() / 1000)}:R> (about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} remaining).`,
+        allowedMentions: { users: [user.id] }
+      });
+      return true;
+    }
+    throw error;
+  }
 
-  const { logInfo } = require('../../utils/logger');
-  await logInfo('RAID_ROLE_PING_SENT', {
-    category: 'RAID_PING',
-    guildId: message.guild.id,
+  let result;
+  try {
+    result = await validateAndPingRoles(raidElements, guildRoles, message.channel);
+  } catch (error) {
+    await Raid.deleteOne({ raidId }).catch(() => {});
+    throw error;
+  }
+  if (result.sent.length === 0) {
+    await Raid.deleteOne({ raidId }).catch(() => {});
+    return false;
+  }
+
+  console.log('[RAID_PING] ROLES_SUMMONED_FROM_REACTION', {
+    messageId: message.id,
     channelId: message.channel.id,
-    metadata: { elements: raidElements, rolesSent: result.sent, missing: result.missing, sourceMessageId: message.id }
+    elements: raidElements,
+    rolesSent: result.sent,
+    missing: result.missing,
+    reactedBy: user.id
   });
+  return true;
+}
+
+async function handleRaidSummonButton(interaction) {
+  if (!interaction.customId.startsWith('raid_summon_')) return false;
+
+  const [, , raidId, sourceMessageId] = interaction.customId.split('_');
+  const sourceMessage = await interaction.channel.messages.fetch(sourceMessageId).catch(() => null);
+  if (!sourceMessage || sourceMessage.author?.id !== LUVI_BOT_ID || !isRaidEmbed(sourceMessage)) {
+    await interaction.reply({ content: 'The original raid message could not be verified.', ephemeral: true });
+    return true;
+  }
+
+  const { GuildRoles, Raid } = require('../../database/raid-ping.model');
+  const guildRoles = await GuildRoles.findForGuild(interaction.guild.id);
+  const leaderId = extractLeaderId(sourceMessage);
+  if (!leaderId || interaction.user.id !== leaderId) {
+    await interaction.reply({ content: `Only the raid leader (<@${leaderId || 'unknown'}>) can summon these roles.`, ephemeral: true });
+    return true;
+  }
+
+  const raidElements = sourceMessage.embeds.flatMap(extractElements);
+  const roles = raidElements.map(element =>
+    guildRoles?.roles?.[element] || (element === 'neutral' ? guildRoles?.roles?.normal : null)
+  ).filter(Boolean);
+  if (roles.length === 0) {
+    await interaction.reply({ content: 'No element roles are configured for this raid.', ephemeral: true });
+    return true;
+  }
+
+  try {
+    await Raid.create({ raidId, elements: raidElements });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existingRaid = await Raid.findOne({ raidId }).lean();
+      const expiresAt = existingRaid
+        ? new Date(new Date(existingRaid.createdAt).getTime() + RAID_PING_COOLDOWN_SECONDS * 1000)
+        : new Date(Date.now() + RAID_PING_COOLDOWN_SECONDS * 1000);
+      const minutes = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+      await logRaidDecision(sourceMessage, 'SUMMON_BLOCKED_COOLDOWN', { raidId, reactedBy: interaction.user.id, expiresAt: expiresAt.toISOString(), remainingMinutes: minutes });
+      await interaction.reply({ content: `This raid was already summoned. You can summon it again <t:${Math.floor(expiresAt.getTime() / 1000)}:R> (about ${minutes} minute${minutes === 1 ? '' : 's'} remaining).`, ephemeral: true });
+      return true;
+    }
+    throw error;
+  }
+
+  await interaction.reply({
+    content: `<@${leaderId}> summoned ${roles.map(roleId => `<@&${roleId}>`).join(' ')}`,
+    allowedMentions: { users: [leaderId], roles }
+  });
+  await logRaidDecision(sourceMessage, 'ROLES_SUMMONED', { raidId, summonedBy: leaderId, roleIds: roles });
   return true;
 }
 
 module.exports = {
   extractElements,
   validateAndPingRoles,
-  handleRaidPingMessage
+  handleRaidPingMessage,
+  handleRaidPingReaction,
+  handleRaidSummonButton,
+  isRaidEmbed,
+  extractRaidId,
+  extractLeaderId,
+  extractPartyLeaderId,
+  extractTriggerUserId,
+  trackRaidTrigger
 };

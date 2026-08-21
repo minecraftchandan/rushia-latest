@@ -192,7 +192,15 @@ async function checkReminders(client) {
             await Reminder.deleteMany({ _id: { $in: reminderData.reminderIds } });
           }
         } catch (error) {
-          // Silent fail - don't spam logs
+          await logError('REMINDER_SEND_ERROR', {
+            category: 'REMINDER',
+            action: 'SEND_ERROR',
+            userId: reminderData.userId,
+            guildId: reminderData.guildId,
+            type: reminderData.type,
+            error: error.message,
+            stack: error.stack
+          });
         }
       })());
     }
@@ -207,7 +215,12 @@ async function checkReminders(client) {
     }
 
   } catch (error) {
-    // Silent - don't spam logs
+    await logError('SCHEDULER_ERROR', {
+      category: 'SYSTEM',
+      action: 'SCHEDULER_ERROR',
+      error: error.message,
+      stack: error.stack
+    });
   }
 }
 
@@ -215,8 +228,17 @@ function startScheduler(client) {
   stopScheduler();
   
   (function schedule() {
-    schedulerTimeout = setTimeout(() => {
-      checkReminders(client).catch(() => {}); // Silent error handling
+    schedulerTimeout = setTimeout(async () => {
+      try {
+        await checkReminders(client);
+      } catch (error) {
+        await logError('SCHEDULER_TICK_ERROR', {
+          category: 'SYSTEM',
+          action: 'SCHEDULER_TICK_ERROR',
+          error: error.message,
+          stack: error.stack
+        });
+      }
       schedule();
     }, SCHEDULER.CHECK_INTERVAL);
   })();

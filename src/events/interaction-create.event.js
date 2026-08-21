@@ -64,6 +64,13 @@ module.exports = {
             } catch (error) {
                 sendError('Error handling string select menu:', error);
             }
+        } else if (interaction.isMentionableSelectMenu()) {
+            try {
+                const raidConfig = require('../commands/raidconfig');
+                if (await raidConfig.handleRoleSelect(interaction)) return;
+            } catch (error) {
+                sendError('Error handling raid role select:', error);
+            }
         } else if (interaction.isModalSubmit()) {
             try {
                 const raidConfig = require('../commands/raidconfig');
@@ -76,6 +83,9 @@ module.exports = {
             }
         } else if (interaction.isButton()) {
             try {
+                const { handleRaidSummonButton } = require('../systems/raid/raid-ping.system');
+                if (await handleRaidSummonButton(interaction)) return;
+
                 const raidConfig = require('../commands/raidconfig');
                 if (await raidConfig.handleButton(interaction)) return;
 

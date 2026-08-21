@@ -1,14 +1,13 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const giveawaySystem = require('../systems/giveaway/giveaway.system');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 /**
  * Check if user has permission to use gawk commands
  * Must be either bot owner or server admin
  */
 function hasGawkPermission(user, guild) {
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-
   if (user.id === BOT_OWNER_ID) {
     return true;
   }

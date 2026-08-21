@@ -1,11 +1,10 @@
 const { PermissionFlagsBits } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const PogGuild = require('../database/pog-guild.model');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 // Text command handler for rsetpog
 async function handleSetpogCommand(message, args) {
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-  
   if (!message.guild) {
     await message.reply('❌ This command can only be used in a server.');
     return;

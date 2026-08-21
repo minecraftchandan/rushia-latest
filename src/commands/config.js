@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const { getSettings, updateSettings } = require('../utils/settings.manager');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,7 +11,6 @@ module.exports = {
 
   async execute(interaction) {
     // Check if user is bot owner or has admin permissions
-    const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
     const isOwner = interaction.user.id === BOT_OWNER_ID;
     const hasAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
@@ -83,7 +83,6 @@ async function handleConfigToggle(interaction) {
   }
 
   // Check if user is bot owner or has admin permissions
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = interaction.user.id === BOT_OWNER_ID;
   const hasAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
@@ -127,7 +126,6 @@ async function handleConfigCommand(message) {
   }
 
   // Check if user is bot owner or has admin permissions
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
   const isOwner = message.author.id === BOT_OWNER_ID;
   const hasAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
 

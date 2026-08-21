@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const mongoose = require('mongoose');
 const os = require('os');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 function formatUptime(ms) {
   const days = Math.floor(ms / 86400000);
@@ -37,8 +38,6 @@ async function pingDatabase(connection) {
 }
 
 async function handleRstatsCommand(message) {
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-
   if (message.author.id !== BOT_OWNER_ID) {
     await message.reply('🚫 This command is only available to the bot owner.');
     return;

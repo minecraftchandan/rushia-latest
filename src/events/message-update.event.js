@@ -4,6 +4,7 @@ const { processRaidSpawnMessage } = require('../systems/reminders/raid-spawn-rem
 const { processRaidWishlist } = require('../systems/raid/raid-wishlist.system');
 const { addIdReaction } = require('../systems/cards/id-fetch.system');
 const { processClashMessage } = require('../systems/leaderboard/clash-count.system');
+const { processRaidMessage } = require('../systems/reminders/raid-reminder.system');
 const { LUVI_BOT_ID } = require('../config/constants');
 
 module.exports = {
@@ -11,10 +12,11 @@ module.exports = {
     async execute(oldMessage, newMessage) {
         if (newMessage.author.id !== LUVI_BOT_ID) return;
 
-        await processRaidSpawnMessage(newMessage);
-        await processRaidWishlist(newMessage);
-        await processClashMessage(newMessage);
-        await addIdReaction(newMessage);
-        await processExpeditionMessage(newMessage);
+    await processRaidSpawnMessage(newMessage);
+    await processRaidWishlist(newMessage);
+    await processClashMessage(newMessage);
+    await addIdReaction(newMessage);
+    await processExpeditionMessage(newMessage);
+    await processRaidMessage(newMessage);
     }
 };

@@ -1,10 +1,9 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { sendLog, sendError } = require('../../utils/logger');
+const { BOT_OWNER_ID } = require('../../config/constants');
 
 async function handleServerInfoCommand(message, serverId) {
   try {
-    const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-    
     if (message.author.id !== BOT_OWNER_ID) {
       return message.reply('This command is restricted to the bot owner only.');
     }
@@ -61,7 +60,6 @@ async function handleServerListCommand(messageOrInteraction, page = 0) {
     const user = isMessage ? messageOrInteraction.author : messageOrInteraction.user;
     
     // Check if user is bot owner
-    const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
     if (user.id !== BOT_OWNER_ID) {
       const content = 'This command is restricted to the bot owner only.';
       if (isMessage) {

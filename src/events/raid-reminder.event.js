@@ -29,9 +29,26 @@ module.exports = [
     {
         name: Events.MessageCreate,
         async execute(message) {
-            await handleRaidReminder(message);
-            if (message.author?.id === LUVI_BOT_ID) {
+            try {
                 await handleRaidPingMessage(message);
+            } catch (error) {
+                console.error('[RAID_PING] REACTION_SETUP_FAILED', {
+                    messageId: message.id,
+                    guildId: message.guild?.id,
+                    channelId: message.channel?.id,
+                    error: error.message
+                });
+            }
+
+            try {
+                await handleRaidReminder(message);
+            } catch (error) {
+                console.error('[REMINDER] PROCESSING_FAILED', {
+                    messageId: message.id,
+                    guildId: message.guild?.id,
+                    channelId: message.channel?.id,
+                    error: error.message
+                });
             }
         }
     }

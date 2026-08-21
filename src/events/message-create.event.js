@@ -9,13 +9,18 @@ const { processDropCount } = require('../systems/leaderboard/drop-count.system')
 const { processClashMessage } = require('../systems/leaderboard/clash-count.system');
 const { processPogMessage } = require('../systems/boss/pog.system');
 const { processSeriesMessage } = require('../systems/cards/series.system');
-const { LUVI_BOT_ID, SOFI_BOT_ID } = require('../config/constants');
+const { BOT_OWNER_ID, LUVI_BOT_ID, SOFI_BOT_ID } = require('../config/constants');
 const { addIdReaction } = require('../systems/cards/id-fetch.system');
 
 module.exports = {
     name: Events.MessageCreate,
     async execute(message) {
         const client = message.client;
+
+        if (!message.author.bot && message.mentions.users.has(LUVI_BOT_ID)) {
+            const { trackRaidTrigger } = require('../systems/raid/raid-ping.system');
+            trackRaidTrigger(message);
+        }
 
         if (!message.author.bot) await processUserSpawnCommand(message);
 
@@ -25,10 +30,12 @@ module.exports = {
             const content = message.content.replace(mentionRegex, '').trim();
             message.commandContent = content;
 
-            // Owner-only embed inspector: @bot <message-id>
-            const { handleEmbedInspectCommand } = require('../systems/embed-inspector.system');
-            if (await handleEmbedInspectCommand(message, content)) return;
-            
+            if (content.match(/^raidconfig$/i)) {
+                const { handleRaidConfigCommand } = require('../commands/raidconfig');
+                await handleRaidConfigCommand(message);
+                return;
+            }
+
             // Wishlist add command: @Bot wa name or @Bot wa name1,name2,name3
             const waMatch = content.match(/^wa\s+(.+)$/i);
             if (waMatch) {
@@ -155,7 +162,7 @@ module.exports = {
                 return;
             }
 
-            if (/^gawk\b/i.test(content) && message.author.id === process.env.BOT_OWNER_ID) {
+            if (/^gawk\b/i.test(content) && message.author.id === BOT_OWNER_ID) {
                 await message.reply(`Debug: parsed content is \`${content}\``);
                 return;
             }
@@ -279,7 +286,7 @@ module.exports = {
                 await handleConfigCommand(message);
                 return;
             }
-            
+
             if (command === 'setpog') {
                 const { handleSetpogCommand } = require('../commands/set-pog');
                 await handleSetpogCommand(message, args.slice(1));

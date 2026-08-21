@@ -1,10 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, sendError } = require('../utils/logger');
 const PogGuild = require('../database/pog-guild.model');
+const { BOT_OWNER_ID } = require('../config/constants');
 
 async function handleMinfoCommand(message) {
-  const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-
   // Check if user is bot owner
   if (message.author.id !== BOT_OWNER_ID) {
     await message.reply('🚫 This command is only available to the bot owner.');
