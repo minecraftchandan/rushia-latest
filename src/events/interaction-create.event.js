@@ -66,6 +66,9 @@ module.exports = {
             }
         } else if (interaction.isModalSubmit()) {
             try {
+                const raidConfig = require('../commands/raidconfig');
+                if (await raidConfig.handleModal(interaction)) return;
+
                 const { handleGawkInteraction } = require('../commands/gawk');
                 if (await handleGawkInteraction(interaction)) return;
             } catch (error) {
@@ -73,6 +76,9 @@ module.exports = {
             }
         } else if (interaction.isButton()) {
             try {
+                const raidConfig = require('../commands/raidconfig');
+                if (await raidConfig.handleButton(interaction)) return;
+
                 const { handleGawkInteraction } = require('../commands/gawk');
                 if (await handleGawkInteraction(interaction)) return;
                 

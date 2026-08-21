@@ -33,6 +33,7 @@ class DatabaseManager {
       const RarityDrop = require('./rarity-drop.model');
       const ClashCount = require('./clash-count.model');
       const UsernameCache = require('./username-cache.model');
+      const { GuildRoles } = require('./raid-ping.model');
 
       await Promise.all([
         Reminder.createIndexes(),
@@ -41,7 +42,8 @@ class DatabaseManager {
         Drops.createIndexes(),
         RarityDrop.createIndexes(),
         ClashCount.createIndexes(),
-        UsernameCache.createIndexes()
+        UsernameCache.createIndexes(),
+        GuildRoles.createIndexes()
       ]);
       
       try {

@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { processRaidMessage } = require('../systems/reminders/raid-reminder.system');
+const { handleRaidPingMessage } = require('../systems/raid/raid-ping.system');
 const { LUVI_BOT_ID } = require('../config/constants');
 const { getSettings } = require('../utils/settings.manager');
 
@@ -29,6 +30,9 @@ module.exports = [
         name: Events.MessageCreate,
         async execute(message) {
             await handleRaidReminder(message);
+            if (message.author?.id === LUVI_BOT_ID) {
+                await handleRaidPingMessage(message);
+            }
         }
     }
 ];

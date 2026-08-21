@@ -24,6 +24,10 @@ module.exports = {
             const mentionRegex = new RegExp(`^<@!?${client.user.id}>\\s*`, 'i');
             const content = message.content.replace(mentionRegex, '').trim();
             message.commandContent = content;
+
+            // Owner-only embed inspector: @bot <message-id>
+            const { handleEmbedInspectCommand } = require('../systems/embed-inspector.system');
+            if (await handleEmbedInspectCommand(message, content)) return;
             
             // Wishlist add command: @Bot wa name or @Bot wa name1,name2,name3
             const waMatch = content.match(/^wa\s+(.+)$/i);
