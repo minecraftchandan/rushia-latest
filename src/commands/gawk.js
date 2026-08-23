@@ -191,7 +191,13 @@ async function handleViewGawkCommand(message) {
 
 async function handleGawkInteraction(interaction) {
   try {
-    // Check permissions for all gawk interactions
+    const isGawkInteraction = (
+      (interaction.isStringSelectMenu() && interaction.customId === 'gawk_task_select') ||
+      (interaction.isButton() && ['gawk_set_count', 'gawk_set_role', 'gawk_view_delete'].includes(interaction.customId)) ||
+      (interaction.isModalSubmit() && ['gawk_count_modal', 'gawk_role_modal'].includes(interaction.customId))
+    );
+    if (!isGawkInteraction) return false;
+
     if (!hasGawkPermission(interaction.user, interaction.guild)) {
       await interaction.reply({ 
         content: '🚫 You must be a server admin or bot owner to use this command.', 

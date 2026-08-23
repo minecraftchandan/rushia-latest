@@ -1,11 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { BOT_OWNER_ID, LUVI_BOT_ID, RAID_ELEMENT_EMOJIS, RAID_PING_COOLDOWN_SECONDS } = require('../../config/constants');
 
-function logRaidDecision(message, decision, metadata = {}) {
-  const details = { messageId: message.id, channelId: message.channel?.id, ...metadata };
-  console.log(`[RAID_PING] ${decision}`, details);
-}
-
 const pendingRaidTriggers = new Map();
 const RAID_TRIGGER_TTL_MS = 10 * 1000;
 const announcedRaidMessages = new Map();
@@ -41,20 +36,34 @@ function extractPartyLeaderId(message) {
 }
 
 function extractTriggerUserId(message) {
+  // Prefer explicit interaction metadata if present (slash commands)
   const interactionUserId = message.interactionMetadata?.user?.id ||
     message.interactionMetadata?.userId ||
     message.interaction?.user?.id ||
     message.interaction?.userId;
   if (interactionUserId) return interactionUserId;
 
+  // Fallback to a recently tracked mention-based trigger (e.g., @Luvi raid view)
   const pending = pendingRaidTriggers.get(message.channel?.id);
-  if (!pending) return null;
-  if (pending.expiresAt < Date.now()) {
-    pendingRaidTriggers.delete(message.channel.id);
-    return null;
+  if (pending) {
+    if (pending.expiresAt < Date.now()) {
+      pendingRaidTriggers.delete(message.channel.id);
+    } else {
+      pendingRaidTriggers.delete(message.channel.id);
+      return pending.userId;
+    }
   }
-  pendingRaidTriggers.delete(message.channel.id);
-  return pending.userId;
+
+  // Final fallback: if neither interaction nor a pending trigger exists, try to
+  // infer the trigger from the embed's party leader. This helps when the
+  // originating bot posts the embed without preserving interaction metadata
+  // (some webhook-style responses).
+  const inferredLeader = extractPartyLeaderId(message);
+  if (inferredLeader) {
+    return inferredLeader;
+  }
+
+  return null;
 }
 
 function extractLeaderId(message) {
@@ -95,58 +104,46 @@ async function handleRaidPingMessage(message) {
   if (!message.embeds?.length) {
     if (pendingRaidFetches.has(message.id)) return false;
     pendingRaidFetches.add(message.id);
+
     setTimeout(async () => {
       try {
         const fetchedMessage = await message.channel.messages.fetch(message.id);
+        if (!fetchedMessage.embeds?.length) return;
         await handleRaidPingMessage(fetchedMessage);
       } catch (error) {
         console.error('[RAID_PING] DEFERRED_FETCH_FAILED', { messageId: message.id, error: error.message });
       } finally {
         pendingRaidFetches.delete(message.id);
       }
-    }, 1000);
+    }, 2000);
     return false;
   }
   if (!isRaidEmbed(message)) {
-    await logRaidDecision(message, 'SKIPPED_NOT_RAID_EMBED', { embedCount: message.embeds.length });
     return false;
   }
 
   const { GuildRoles } = require('../../database/raid-ping.model');
   const guildRoles = await GuildRoles.findForGuild(message.guild.id);
   if (!guildRoles) {
-    await logRaidDecision(message, 'SKIPPED_NO_ROLE_CONFIGURATION', { guildId: message.guild.id });
     return false;
   }
   const triggerUserId = extractTriggerUserId(message);
   const leaderId = extractPartyLeaderId(message) || triggerUserId;
   const raidId = extractRaidId(message);
   const raidElements = message.embeds.flatMap(extractElements);
-  await logRaidDecision(message, 'CHECK', {
-    triggerUserId,
-    leaderId,
-    raidId,
-    raidElements,
-    hasInteractionMetadata: Boolean(message.interactionMetadata),
-    hasInteraction: Boolean(message.interaction)
-  });
   if (!triggerUserId) {
-    await logRaidDecision(message, 'SKIPPED_NO_TRIGGER_USER', { leaderId });
     return false;
   }
   if (!leaderId || triggerUserId !== leaderId) {
-    await logRaidDecision(message, 'SKIPPED_TRIGGER_NOT_LEADER', { triggerUserId, leaderId });
     return false;
   }
 
   if (!raidId || raidElements.length === 0) {
-    await logRaidDecision(message, 'SKIPPED_MISSING_RAID_DATA', { raidId, raidElements });
     return false;
   }
 
   const announcedAt = announcedRaidMessages.get(message.id);
   if (announcedAt && Date.now() - announcedAt < ANNOUNCEMENT_DEDUPE_MS) {
-    await logRaidDecision(message, 'SKIPPED_DUPLICATE_EVENT', { raidId });
     return false;
   }
 
@@ -157,7 +154,6 @@ async function handleRaidPingMessage(message) {
     }))
     .filter(item => item.roleId);
   if (roles.length === 0) {
-    await logRaidDecision(message, 'SKIPPED_NO_MATCHING_ROLES', { raidId, raidElements, configuredRoles: guildRoles.roles || {} });
     return false;
   }
 
@@ -194,7 +190,6 @@ async function handleRaidPingMessage(message) {
     announcedRaidMessages.delete(message.id);
     throw error;
   }
-  await logRaidDecision(message, 'ANNOUNCEMENT_SENT', { raidId, triggerUserId, leaderId, raidElements, roleIds: roles.map(role => role.roleId), announcementId: announcementMessage.id });
   return true;
 }
 
@@ -274,14 +269,6 @@ async function handleRaidPingReaction(reaction, user) {
     return false;
   }
 
-  console.log('[RAID_PING] ROLES_SUMMONED_FROM_REACTION', {
-    messageId: message.id,
-    channelId: message.channel.id,
-    elements: raidElements,
-    rolesSent: result.sent,
-    missing: result.missing,
-    reactedBy: user.id
-  });
   return true;
 }
 
@@ -321,7 +308,6 @@ async function handleRaidSummonButton(interaction) {
         ? new Date(new Date(existingRaid.createdAt).getTime() + RAID_PING_COOLDOWN_SECONDS * 1000)
         : new Date(Date.now() + RAID_PING_COOLDOWN_SECONDS * 1000);
       const minutes = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
-      await logRaidDecision(sourceMessage, 'SUMMON_BLOCKED_COOLDOWN', { raidId, reactedBy: interaction.user.id, expiresAt: expiresAt.toISOString(), remainingMinutes: minutes });
       await interaction.reply({ content: `This raid was already summoned. You can summon it again <t:${Math.floor(expiresAt.getTime() / 1000)}:R> (about ${minutes} minute${minutes === 1 ? '' : 's'} remaining).`, ephemeral: true });
       return true;
     }
@@ -332,7 +318,6 @@ async function handleRaidSummonButton(interaction) {
     content: `<@${leaderId}> summoned ${roles.map(roleId => `<@&${roleId}>`).join(' ')}`,
     allowedMentions: { users: [leaderId], roles }
   });
-  await logRaidDecision(sourceMessage, 'ROLES_SUMMONED', { raidId, summonedBy: leaderId, roleIds: roles });
   return true;
 }
 

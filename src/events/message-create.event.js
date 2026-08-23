@@ -7,6 +7,7 @@ const { processDropMessage } = require('../systems/reminders/drop-reminder.syste
 const { processRarityDrop } = require('../systems/leaderboard/rarity-drop.system');
 const { processDropCount } = require('../systems/leaderboard/drop-count.system');
 const { processClashMessage } = require('../systems/leaderboard/clash-count.system');
+const { processIconicMessage } = require('../systems/leaderboard/iconic-count.system');
 const { processPogMessage } = require('../systems/boss/pog.system');
 const { processSeriesMessage } = require('../systems/cards/series.system');
 const { BOT_OWNER_ID, LUVI_BOT_ID, SOFI_BOT_ID } = require('../config/constants');
@@ -151,6 +152,30 @@ module.exports = {
             if (content.match(/^(?:rlb|lb)$/i)) {
                 const { handleRlbCommand } = require('../systems/leaderboard/leaderboard.system');
                 await handleRlbCommand(message);
+                return;
+            }
+
+            if (content.match(/^(?:rdlb|dlb)$/i)) {
+                const { handleRdlbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRdlbCommand(message);
+                return;
+            }
+
+            if (content.match(/^(?:rrlb|rlb2)$/i)) {
+                const { handleRrlbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRrlbCommand(message);
+                return;
+            }
+
+            if (content.match(/^(?:rclb|clb)$/i)) {
+                const { handleRclbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRclbCommand(message);
+                return;
+            }
+
+            if (content.match(/^(?:rilb|ilb)$/i)) {
+                const { handleRilbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRilbCommand(message);
                 return;
             }
             
@@ -305,6 +330,30 @@ module.exports = {
                 await handleRlbCommand(message);
                 return;
             }
+
+            if (command === 'dlb' || command === 'rdlb') {
+                const { handleRdlbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRdlbCommand(message);
+                return;
+            }
+
+            if (command === 'rrlb') {
+                const { handleRrlbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRrlbCommand(message);
+                return;
+            }
+
+            if (command === 'clb' || command === 'rclb') {
+                const { handleRclbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRclbCommand(message);
+                return;
+            }
+
+            if (command === 'ilb' || command === 'rilb') {
+                const { handleRilbCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleRilbCommand(message);
+                return;
+            }
             
             // Role delays
             if ((command === 'delay' || command === 'd') && args[1]) {
@@ -359,6 +408,7 @@ module.exports = {
         await processRarityDrop(message);
         await processDropCount(message);
         await processClashMessage(message);
+        await processIconicMessage(message);
         await processBossMessage(message);
         await addIdReaction(message);
         

@@ -50,17 +50,18 @@ module.exports = {
             try {
                 const { handleGawkInteraction } = require('../commands/gawk');
                 if (await handleGawkInteraction(interaction)) return;
-                
+
+                const { handleLbSelect, handleResetTypeSelect } = require('../systems/leaderboard/leaderboard.system');
+                if (await handleLbSelect(interaction)) return;
+                if (interaction.customId.startsWith('reset_type_select_')) {
+                    await handleResetTypeSelect(interaction);
+                    return;
+                }
+
                 const { handleReminderInteraction } = require('../utils/reminder.viewer');
                 if (await handleReminderInteraction(interaction)) return;
                 const { handleHelpCategory } = require('../commands/help');
                 if (await handleHelpCategory(interaction)) return;
-
-                if (interaction.customId.startsWith('reset_type_select_')) {
-                    const { handleResetTypeSelect } = require('../systems/leaderboard/leaderboard.system');
-                    await handleResetTypeSelect(interaction);
-                    return;
-                }
             } catch (error) {
                 sendError('Error handling string select menu:', error);
             }
@@ -111,27 +112,8 @@ module.exports = {
                     return;
                 }
                 
-                const { handleRarityButton, handleClashButton, handleClashPagination, handleBackButton, handleResetButton, handleResetTypeSelect, handleConfirmReset, handleCancelReset, handleRlbPagination } = require('../systems/leaderboard/leaderboard.system');
-                if (interaction.customId.startsWith('rlb_')) {
-                    await handleRlbPagination(interaction);
-                    return;
-                }
-                if (interaction.customId.startsWith('clash_prev_') || interaction.customId.startsWith('clash_next_')) {
-                    await handleClashPagination(interaction);
-                    return;
-                }
-                if (interaction.customId.startsWith('view_clash_lb_')) {
-                    await handleClashButton(interaction);
-                    return;
-                }
-                if (interaction.customId.startsWith('view_rarity_drops_')) {
-                    await handleRarityButton(interaction);
-                    return;
-                }
-                if (interaction.customId.startsWith('back_to_drops_')) {
-                    await handleBackButton(interaction);
-                    return;
-                }
+                const { handleLbPagination, handleResetButton, handleConfirmReset, handleCancelReset } = require('../systems/leaderboard/leaderboard.system');
+                if (await handleLbPagination(interaction)) return;
                 if (interaction.customId.startsWith('reset_drops_')) {
                     await handleResetButton(interaction);
                     return;
