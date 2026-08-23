@@ -83,4 +83,20 @@ async function detectAndSetRaidSpawnReminder(message) {
   }
 }
 
-module.exports = { processRaidSpawnMessage: detectAndSetRaidSpawnReminder, processUserSpawnCommand };
+async function resolveRaidSpawnUserId(message) {
+  if (!message) return null;
+  // Prefer interaction metadata (slash command) when available
+  let userId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
+
+  // Fallback: check pending manual spawn recorded for this channel
+  if (!userId) {
+    const pending = pendingSpawns.get(message.channel.id);
+    if (pending && Date.now() < pending.expiresAt) {
+      userId = pending.userId;
+    }
+  }
+
+  return userId || null;
+}
+
+module.exports = { processRaidSpawnMessage: detectAndSetRaidSpawnReminder, processUserSpawnCommand, resolveRaidSpawnUserId };

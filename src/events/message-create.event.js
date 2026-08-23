@@ -178,6 +178,13 @@ module.exports = {
                 await handleRilbCommand(message);
                 return;
             }
+
+            // Admin manual leaderboard adjustments: @Bot radd|rdel ...
+            if (content.match(/^(?:radd|rdel)\b/i)) {
+                const { handleAdminRCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleAdminRCommand(message);
+                return;
+            }
             
             // Gawk command: @bot gawk set|view
             const gawkMatch = content.match(/^gawk\s+(set|view)$/i);
@@ -200,6 +207,9 @@ module.exports = {
                 await handleRoleDelay(message, args);
                 return;
             }
+
+            // Admin manual leaderboard adjustments (mention form): @Bot radd|rdel ...
+            // already handled above in mention block
             
             // View role delays: @bot delays or @bot viewdelays
             if (content.match(/^(?:delays|viewdelays)$/i)) {
@@ -328,6 +338,13 @@ module.exports = {
             if (command === 'lb' || command === 'rlb') {
                 const { handleRlbCommand } = require('../systems/leaderboard/leaderboard.system');
                 await handleRlbCommand(message);
+                return;
+            }
+
+            // Admin manual leaderboard adjustments (prefix form): radd -> command 'add' when using single-letter prefix
+            if (command === 'add' || command === 'del') {
+                const { handleAdminRCommand } = require('../systems/leaderboard/leaderboard.system');
+                await handleAdminRCommand(message);
                 return;
             }
 

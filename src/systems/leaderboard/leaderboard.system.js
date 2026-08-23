@@ -409,6 +409,116 @@ async function handleCancelReset(interaction) {
   await interaction.update({ content: '❌ Reset cancelled.', components: [] });
 }
 
+async function handleAdminRCommand(message) {
+  // Admin-only manual add/remove points: Usage examples
+  // radd @user d 10    -> add 10 drops
+  // radd @user drop 1  -> add 1 drop
+  // rdel @user r 5     -> remove 5 rarity points
+  // aliases: d|drop, r|rare|rarity, c|clash, i|iconic
+  try {
+    if (!message.guild) return;
+    const isOwner = message.author.id === BOT_OWNER_ID;
+    const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+    if (!isOwner && !isAdmin) return message.channel.send('❌ Only server administrators or the bot owner can use this command.').catch(() => {});
+
+    // Prefer the mention-stripped commandContent when present (mention form), otherwise fall back to raw message.content
+    const raw = (message.commandContent && message.commandContent.trim().length) ? message.commandContent.trim() : message.content.trim();
+    const parts = raw.split(/\s+/);
+    // Accept both prefixed and full commands: radd/rdel OR add/del (when using single-letter 'r' prefix)
+    const cmd = parts[0].toLowerCase();
+    if (!['radd','rdel','add','del'].includes(cmd)) return;
+
+    if (parts.length < 3) return message.channel.send('Usage: radd @user <d|drop|r|rare|rarity|ex|leg|c|clash|i|iconic> <amount>').catch(() => {});
+
+    // parse mention / id
+    const mention = parts[1];
+    const userIdMatch = mention.match(/^<@!?(\d+)>$/) || mention.match(/^(\d+)$/);
+    if (!userIdMatch) return message.channel.send('Please mention a user or provide a user id.').catch(() => {});
+    const targetUserId = userIdMatch[1];
+
+    let typeAlias = (parts[2] || '').toLowerCase();
+    let amount = 1;
+    let rarityField = null; // for RarityDrop: 'exotic_count' or 'legendary_count'
+
+    // handle rarities with subtypes: examples
+    // radd @user r ex 1   -> parts[2]='r', parts[3]='ex', parts[4]='1'
+    // radd @user ex 1     -> parts[2]='ex', parts[3]='1'
+    if (['ex','exotic','leg','legendary'].includes(typeAlias)) {
+      // direct subtype given
+      rarityField = (['ex','exotic'].includes(typeAlias)) ? 'exotic_count' : 'legendary_count';
+      amount = parts[3] ? parseInt(parts[3], 10) : 1;
+    } else if (['r','rare','rarity'].includes(typeAlias)) {
+      const sub = (parts[3] || '').toLowerCase();
+      if (['ex','exotic'].includes(sub)) {
+        rarityField = 'exotic_count';
+        amount = parts[4] ? parseInt(parts[4], 10) : 1;
+      } else if (['leg','legendary'].includes(sub)) {
+        rarityField = 'legendary_count';
+        amount = parts[4] ? parseInt(parts[4], 10) : 1;
+      } else {
+        // default to exotic if no subtype given, amount in parts[3]
+        rarityField = 'exotic_count';
+        amount = parts[3] ? parseInt(parts[3], 10) : 1;
+      }
+    } else {
+      // non-rarity types: amount is parts[3]
+      amount = parts[3] ? parseInt(parts[3], 10) : 1;
+    }
+
+    if (isNaN(amount) || amount === 0) return message.channel.send('Please provide a non-zero integer amount.').catch(() => {});
+
+    // resolve leaderboard and model
+    let model = null;
+    let label = null;
+    if (['d','drop'].includes(typeAlias)) { model = Drops; label = 'Drop'; }
+    else if (['r','rare','rarity','ex','exotic','leg','legendary'].includes(typeAlias)) { model = RarityDrop; label = 'Rarity Drop'; }
+    else if (['c','clash'].includes(typeAlias)) { model = ClashCount; label = 'Clash'; }
+    else if (['i','iconic'].includes(typeAlias)) { model = IconicCount; label = 'Iconic'; }
+    else return message.channel.send('Unknown leaderboard type. Use d/r/c/i and for rarity use ex|leg or r ex|r leg.').catch(() => {});
+
+    const guildId = message.guild.id;
+    // upsert the target user's record
+    const existing = await model.findOne({ guildId, userId: targetUserId });
+    const isAdd = ['radd','add'].includes(cmd);
+
+    if (isAdd) {
+      if (existing) {
+        // increment appropriate field
+        if (model === RarityDrop) {
+          if (!rarityField) rarityField = 'exotic_count';
+          existing[rarityField] = (existing[rarityField] || 0) + amount;
+        } else if (model === ClashCount) {
+          existing.clash_count = (existing.clash_count || 0) + amount;
+        } else if (model === IconicCount) {
+          existing.iconic_count = (existing.iconic_count || 0) + amount;
+        } else {
+          existing.drop_count = (existing.drop_count || 0) + amount;
+        }
+        await existing.save();
+      } else {
+        const doc = { guildId, userId: targetUserId };
+        if (model === RarityDrop) doc[rarityField || 'exotic_count'] = amount; else if (model === ClashCount) doc.clash_count = amount; else if (model === IconicCount) doc.iconic_count = amount; else doc.drop_count = amount;
+        await model.create(doc);
+      }
+      return message.channel.send(`✅ ${Math.abs(amount)} ${label} point(s) added to <@${targetUserId}>`).catch(() => {});
+    } else {
+      // remove
+      if (!existing) return message.channel.send('User has no record in this leaderboard.').catch(() => {});
+      if (model === RarityDrop) {
+        if (!rarityField) rarityField = 'exotic_count';
+        existing[rarityField] = Math.max(0, (existing[rarityField] || 0) - Math.abs(amount));
+      } else if (model === ClashCount) existing.clash_count = Math.max(0, (existing.clash_count || 0) - Math.abs(amount));
+      else if (model === IconicCount) existing.iconic_count = Math.max(0, (existing.iconic_count || 0) - Math.abs(amount));
+      else existing.drop_count = Math.max(0, (existing.drop_count || 0) - Math.abs(amount));
+      await existing.save();
+      return message.channel.send(`✅ ${Math.abs(amount)} ${label} point(s) removed from <@${targetUserId}>`).catch(() => {});
+    }
+  } catch (err) {
+    await logError('Admin R command error', err);
+    return message.channel.send('❌ An error occurred while processing the command.').catch(() => {});
+  }
+}
+
 module.exports = {
   handleRlbCommand,
   handleRdlbCommand,
@@ -421,4 +531,5 @@ module.exports = {
   handleResetTypeSelect,
   handleConfirmReset,
   handleCancelReset,
+  handleAdminRCommand,
 };
