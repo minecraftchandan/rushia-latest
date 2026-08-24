@@ -6,6 +6,8 @@ const LUVI_ID = '1269481871021047891';
 
 // Track pending spawn attempts: channelId -> { userId, expiresAt }
 const pendingSpawns = new Map();
+// Track pending spawn mapping by raidId -> { userId, expiresAt }
+const pendingSpawnsByRaidId = new Map();
 const PENDING_TTL = 15000; // 15 seconds for Luvi to respond
 
 function trackSpawnAttempt(channelId, userId) {
@@ -13,6 +15,15 @@ function trackSpawnAttempt(channelId, userId) {
   setTimeout(() => {
     const entry = pendingSpawns.get(channelId);
     if (entry && entry.userId === userId) pendingSpawns.delete(channelId);
+  }, PENDING_TTL);
+}
+
+function trackSpawnByRaidId(raidId, userId) {
+  if (!raidId) return;
+  pendingSpawnsByRaidId.set(raidId, { userId, expiresAt: Date.now() + PENDING_TTL });
+  setTimeout(() => {
+    const entry = pendingSpawnsByRaidId.get(raidId);
+    if (entry && entry.userId === userId) pendingSpawnsByRaidId.delete(raidId);
   }, PENDING_TTL);
 }
 
@@ -46,6 +57,10 @@ async function detectAndSetRaidSpawnReminder(message) {
   }
 
   if (!userId) return;
+  // If we resolved a user for this spawn and there's a raidId in the embed or detectedRaid, remember it briefly
+  const raidId = message.detectedRaid?.raidId || (embed?.footer?.text && (embed.footer.text.match(/Raid ID:\s*(\d+)/) || [])[1]);
+  if (raidId) trackSpawnByRaidId(raidId, userId);
+
   pendingSpawns.delete(message.channel.id);
 
   const existingReminder = await checkExistingReminder(userId, 'raidSpawn');
@@ -95,6 +110,19 @@ async function resolveRaidSpawnUserId(message) {
     const pending = pendingSpawns.get(message.channel.id);
     if (pending && Date.now() < pending.expiresAt) {
       userId = pending.userId;
+    }
+  }
+
+  // Fallback: check recent mapping by raidId (some copies of the message may strip interaction metadata)
+  if (!userId) {
+    const raidId = message.detectedRaid?.raidId || (message.embeds?.[0]?.footer?.text && (message.embeds[0].footer.text.match(/Raid ID:\s*(\d+)/) || [])[1]);
+    if (raidId) {
+      const pendingByRaid = pendingSpawnsByRaidId.get(raidId);
+      if (pendingByRaid && Date.now() < pendingByRaid.expiresAt) {
+        userId = pendingByRaid.userId;
+        // consume the mapping once used
+        pendingSpawnsByRaidId.delete(raidId);
+      }
     }
   }
 
