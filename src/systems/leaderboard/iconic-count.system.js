@@ -4,8 +4,10 @@ const { logError } = require('../../utils/logger');
 const { resolveRaidSpawnUserId } = require('../reminders/raid-spawn-reminder.system');
 
 async function processIconicMessage(message) {
-  if (!message.guild || message.author.id !== LUVI_BOT_ID) return;
-  if (Date.now() - message.createdTimestamp > 60000) return;
+  const guildId = message?.guild?.id ?? message?.guildId;
+  if (!guildId || !message?.author || message.author.id !== LUVI_BOT_ID) return;
+  const messageAgeMs = message.createdTimestamp ? Date.now() - message.createdTimestamp : 0;
+  if (messageAgeMs > 30 * 24 * 60 * 60 * 1000) return;
   if (!message.embeds?.length) return;
 
   const embed = message.embeds[0];
@@ -18,7 +20,7 @@ async function processIconicMessage(message) {
 
   try {
     await IconicCount.findOneAndUpdate(
-      { userId, guildId: message.guild.id },
+      { userId, guildId },
       { $inc: { iconic_count: 1 }, $set: { lastIconicAt: new Date() } },
       { upsert: true, new: true }
     );
@@ -27,8 +29,8 @@ async function processIconicMessage(message) {
       operation: 'ICONIC_COUNT',
       action: 'FAILED',
       userId,
-      guildId: message.guild.id,
-      channelId: message.channel.id,
+      guildId,
+      channelId: message.channel?.id,
       metadata: { category: 'ICONIC_COUNT' },
       tags: ['iconic', 'error']
     });

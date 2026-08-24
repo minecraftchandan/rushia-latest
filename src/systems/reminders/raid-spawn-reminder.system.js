@@ -17,17 +17,19 @@ function trackSpawnAttempt(channelId, userId) {
 }
 
 async function processUserSpawnCommand(message) {
-  if (message.author.bot) return;
+  if (!message?.author || message.author.bot) return;
   // Match: @Luvi raid spawn [1-4]
-  if (!message.mentions.users.has(LUVI_ID)) return;
+  if (!message.mentions?.users?.has(LUVI_ID)) return;
   if (!/raid\s+spawn\s+[1-4]/i.test(message.content)) return;
   trackSpawnAttempt(message.channel.id, message.author.id);
 }
 
 async function detectAndSetRaidSpawnReminder(message) {
-  if (!message.guild || message.author.id !== LUVI_ID) return;
-  if (Date.now() - message.createdTimestamp > 60000) return;
-  if (!message.embeds.length) return;
+  const guildId = message?.guild?.id ?? message?.guildId;
+  if (!guildId || !message?.author || message.author.id !== LUVI_ID) return;
+  const messageAgeMs = message.createdTimestamp ? Date.now() - message.createdTimestamp : 0;
+  if (messageAgeMs > 30 * 24 * 60 * 60 * 1000) return;
+  if (!message.embeds?.length) return;
 
   const embed = message.embeds[0];
   if (!embed.title?.includes('Raid Spawned')) return;
@@ -53,7 +55,7 @@ async function detectAndSetRaidSpawnReminder(message) {
 
   const result = await createReminderSafe({
     userId,
-    guildId: message.guild.id,
+    guildId,
     channelId: message.channel.id,
     remindAt,
     type: 'raidSpawn',
@@ -66,7 +68,7 @@ async function detectAndSetRaidSpawnReminder(message) {
       action: 'CREATED',
       type: 'raidSpawn',
       userId,
-      guildId: message.guild.id,
+      guildId,
       channelId: message.channel.id,
       remindAt: remindAt.toISOString()
     });
@@ -76,8 +78,8 @@ async function detectAndSetRaidSpawnReminder(message) {
       action: 'CREATE_FAILED',
       type: 'raidSpawn',
       userId,
-      guildId: message.guild.id,
-      guildName: message.guild.name,
+      guildId,
+      guildName: message.guild?.name,
       error: result.error.message
     });
   }
@@ -89,11 +91,17 @@ async function resolveRaidSpawnUserId(message) {
   let userId = message.interactionMetadata?.user?.id || message.interaction?.user?.id;
 
   // Fallback: check pending manual spawn recorded for this channel
-  if (!userId) {
+  if (!userId && message.channel?.id) {
     const pending = pendingSpawns.get(message.channel.id);
     if (pending && Date.now() < pending.expiresAt) {
       userId = pending.userId;
     }
+  }
+
+  // Final fallback: some exported Discord payloads preserve the user in message.author
+  // when the guild object is stripped during debugging or JSON export.
+  if (!userId && message.author?.id) {
+    userId = message.author.id;
   }
 
   return userId || null;
