@@ -8,7 +8,7 @@ const LUVI_ID = '1269481871021047891';
 const pendingSpawns = new Map();
 // Track pending spawn mapping by raidId -> { userId, expiresAt }
 const pendingSpawnsByRaidId = new Map();
-const PENDING_TTL = 15000; // 15 seconds for Luvi to respond
+const PENDING_TTL = 5 * 60 * 1000; // 5 minutes for Luvi to respond with embed
 
 function trackSpawnAttempt(channelId, userId) {
   pendingSpawns.set(channelId, { userId, expiresAt: Date.now() + PENDING_TTL });
@@ -127,8 +127,9 @@ async function resolveRaidSpawnUserId(message) {
   }
 
   // Final fallback: some exported Discord payloads preserve the user in message.author
-  // when the guild object is stripped during debugging or JSON export.
-  if (!userId && message.author?.id) {
+  // when the guild object is stripped during debugging or JSON export. Only use it if
+  // the author is NOT a bot — otherwise we would credit the iconic to the Luvi bot.
+  if (!userId && message.author?.id && !message.author?.bot) {
     userId = message.author.id;
   }
 

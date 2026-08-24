@@ -1,0 +1,146 @@
+Rushia Bot Help
+===============
+
+Use any of the commands below in Discord.
+
+General bot commands
+--------------------
+- @Rushia help
+  Shows this help list.
+
+- @Rushia stats
+  Shows bot uptime, memory, server count, and database status.
+
+- @Rushia minfo
+  Displays the current POG alert setup for the server.
+
+- rconfig
+  Alias for config.
+
+
+Server setup and admin commands
+-------------------------------
+- /help
+  Displays the interactive help menu.
+
+- /config
+  Opens the admin configuration panel for toggling bot features.
+
+- /view-settings
+  Shows current boss role configuration for the server.
+
+- /set-boss-role [role]
+  Sets or removes the main global boss ping role.
+
+- /multi-roles enable
+  Enables tier-based boss roles with separate roles for each boss tier.
+
+- /multi-roles disable
+  Disables multi-role mode and uses a single boss role instead.
+
+- /multi-roles set-boss <tier> [role]
+  Assigns a role to a specific boss tier.
+
+
+- @Rushia raidconfig
+  Opens the raid role configuration menu.
+
+- @Rushia setpog [#channel]
+  Sets the channel where POG alerts are sent. Without a channel, it disables POG alerts.
+
+
+Notification and reminder commands
+----------------------------------
+- /notifications view
+  Shows your current reminder preferences.
+
+- /notifications set <type> <enabled>
+  Enables or disables a notification type.
+  Available types: expedition, stamina, raid, raidSpawnReminder, drop
+
+- /dm enable <type>
+  Enables DM reminders for a selected type.
+  Types: expedition, stamina, raidSpawn, drop
+
+- /dm disable <type>
+  Disables DM reminders for a selected type.
+
+- @Rushia here
+  Redirects your raid reminders to the current channel for a temporary period.
+
+- @Rushia unhere
+  Clears the temporary reminder channel override.
+
+
+
+- @Rushia nv
+  Views your notification settings.
+
+
+Wishlist and card commands
+--------------------------
+- @Rushia wa <card name>
+  Adds a card to your wishlist.
+
+- @Rushia wl [@user or userId]
+  Shows your wishlist or another user's wishlist.
+
+- @Rushia wr <card name>
+  Removes a card from your wishlist.
+
+- @Rushia find <query>
+  Alias for f.
+
+- /suggestion <suggestion>
+  Sends a suggestion directly to the bot owner.
+
+
+Leaderboard commands
+--------------------
+-  rlb
+  Shows the main leaderboard hub with a summary of all tracked categories.
+
+
+-  rdlb
+  Shows the drop leaderboard.
+
+- @Rushia rrlb
+  Shows the rare drop leaderboard (exotic + legendary counts).
+
+- rclb
+  Shows the clash leaderboard.
+
+-  rilb
+  Shows the iconic leaderboard.
+
+-  radd
+  Admin command for manual leaderboard updates.
+
+-  rdel
+  Admin command for manual leaderboard removal.
+
+How the leaderboard commands relate to each other:
+- rlb is the main leaderboard menu.
+- rdlb, rrlb, rclb, and rilb are direct shortcuts to each leaderboard category.
+- All of them use the same leaderboard system, but each one shows a different tracked stat.
+
+
+Giveaway commands
+-----------------
+- @Rushia gawk set
+  Starts giveaway configuration setup.
+
+- @Rushia gawk view
+  Displays the current giveaway configuration.
+
+
+Role delay commands
+-------------------
+- rdelay <roleId> <time>
+  Delays a role action for a given time.
+
+
+-  rdelays
+  Shows active delayed role jobs.
+
+
