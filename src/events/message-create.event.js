@@ -418,19 +418,36 @@ module.exports = {
 
         if (!settings?.luviEnabled) return;
 
-        await processStaminaMessage(message);
-        await processRaidSpawnMessage(message);
-        await processRaidWishlist(message);
-        await processDropMessage(message);
-        await processRarityDrop(message);
-        await processDropCount(message);
-        await processClashMessage(message);
-        await processIconicMessage(message);
-        await processBossMessage(message);
-        await addIdReaction(message);
+        // Helper to run handlers safely so one failure doesn't stop others
+        async function safeRun(name, fn) {
+            try {
+                await fn(message);
+            } catch (err) {
+                const { logError } = require('../utils/logger');
+                // Log the error with context but continue processing
+                await logError(`Handler failed: ${name}`, err, {
+                    category: 'HANDLER_ERROR',
+                    handler: name,
+                    guildId: message.guildId,
+                    channelId: message.channel?.id
+                });
+            }
+        }
+
+        // Execute Luvi-related handlers; order preserved but each is isolated
+        await safeRun('processStaminaMessage', processStaminaMessage);
+        await safeRun('processRaidSpawnMessage', processRaidSpawnMessage);
+        await safeRun('processRaidWishlist', processRaidWishlist);
+        await safeRun('processDropMessage', processDropMessage);
+        await safeRun('processRarityDrop', processRarityDrop);
+        await safeRun('processDropCount', processDropCount);
+        await safeRun('processClashMessage', processClashMessage);
+        await safeRun('processIconicMessage', processIconicMessage);
+        await safeRun('processBossMessage', processBossMessage);
+        await safeRun('addIdReaction', addIdReaction);
         
         // Track giveaway tasks
         const { processGiveawayTracking } = require('../systems/giveaway/giveaway-tracker.system');
-        await processGiveawayTracking(message);
+        await safeRun('processGiveawayTracking', processGiveawayTracking);
     }
 };
