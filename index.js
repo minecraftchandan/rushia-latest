@@ -1,5 +1,17 @@
 require('dotenv').config();
 
+const originalConsole = {
+  log: console.log.bind(console),
+  info: console.info.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console)
+};
+const isIconicLog = args => args.some(value => typeof value === 'string' && value.includes('[ICONIC_COUNT]'));
+console.log = (...args) => { if (isIconicLog(args)) originalConsole.log(...args); };
+console.info = (...args) => { if (isIconicLog(args)) originalConsole.info(...args); };
+console.warn = (...args) => { if (isIconicLog(args)) originalConsole.warn(...args); };
+console.error = (...args) => { if (isIconicLog(args)) originalConsole.error(...args); };
+
 const { 
   Client, 
   GatewayIntentBits, 
