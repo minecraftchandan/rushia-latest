@@ -1,6 +1,7 @@
 const IconicCount = require('../../database/iconic-count.model');
 const { LUVI_BOT_ID } = require('../../config/constants');
 const { logInfo, logError } = require('../../utils/logger');
+const { getSettings } = require('../../utils/settings.manager');
 const { resolveRaidSpawnUserId } = require('../reminders/raid-spawn-reminder.system');
 
 function logIconic(level, message, details = {}) {
@@ -18,6 +19,15 @@ async function processIconicMessage(message) {
     logIconic('warn', 'SKIP_MISSING_MESSAGE_ID', { guildId });
     return;
   }
+
+  const settings = await getSettings(guildId);
+  const restrictedAddress = settings?.address;
+  const channelId = message.channel?.id ?? message.channelId;
+  if (restrictedAddress && channelId !== restrictedAddress) {
+    logIconic('info', 'SKIP_CHANNEL_FILTER', { messageId, guildId, channelId, restrictedAddress });
+    return;
+  }
+
   const messageAgeMs = message.createdTimestamp ? Date.now() - message.createdTimestamp : 0;
   if (messageAgeMs > 30 * 24 * 60 * 60 * 1000) {
     logIconic('warn', 'SKIP_OLD_MESSAGE', { messageId, guildId, messageAgeMs });
@@ -38,10 +48,18 @@ async function processIconicMessage(message) {
   if (embed.author?.name) parts.push(embed.author.name);
   if (embed.fields?.length) parts.push(embed.fields.map(f => `${f.name} ${f.value}`).join(' '));
   const description = parts.join(' ');
+  const embedTitleText = embed.title || '';
+  const hasRaidSpawnedMarker = /Raid Spawned!/i.test(embedTitleText) || /Raid Spawned!/i.test(description);
   // Match [ICONIC], the custom emoji form with id like <:LU_Iconic:12345>, or the word Iconic
   const hasIconicMarker = /(\[ICONIC\]|<:LU_Iconic:\d+>|Iconic)/i.test(description);
-  if (!hasIconicMarker) {
-    logIconic('info', 'SKIP_NOT_ICONIC', { messageId, guildId });
+  if (!hasIconicMarker || !hasRaidSpawnedMarker) {
+    logIconic('info', 'SKIP_NOT_ICONIC_OR_SPAWN', {
+      messageId,
+      guildId,
+      hasIconicMarker,
+      hasRaidSpawnedMarker,
+      title: embedTitleText
+    });
     return;
   }
 

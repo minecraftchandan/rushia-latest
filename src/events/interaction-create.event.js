@@ -73,15 +73,15 @@ module.exports = {
                 sendError('Error handling raid role select:', error);
             }
         } else if (interaction.isModalSubmit()) {
-            try {
-                const raidConfig = require('../commands/raidconfig');
-                if (await raidConfig.handleModal(interaction)) return;
+           try {
+               const raidConfig = require('../commands/raidconfig');
+               if (await raidConfig.handleModal(interaction)) return;
 
-                const { handleGawkInteraction } = require('../commands/gawk');
-                if (await handleGawkInteraction(interaction)) return;
-            } catch (error) {
-                sendError('Error handling modal submit:', error);
-            }
+               const { handleGawkInteraction } = require('../commands/gawk');
+               if (await handleGawkInteraction(interaction)) return;
+           } catch (error) {
+               sendError('Error handling modal submit:', error);
+           }
         } else if (interaction.isButton()) {
             try {
                 const { handleRaidSummonButton } = require('../systems/raid/raid-ping.system');

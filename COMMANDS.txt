@@ -41,6 +41,9 @@ Server setup and admin commands
 - /multi-roles set-boss <tier> [role]
   Assigns a role to a specific boss tier.
 
+- @Rushia ict [#channel|channelId|none]
+  Restricts iconic counting to one channel in the server. Use `none` to reset back to server-wide counting.
+
 
 - @Rushia raidconfig
   Opens the raid role configuration menu.

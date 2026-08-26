@@ -131,6 +131,13 @@ module.exports = {
                 await handleConfigCommand(message);
                 return;
             }
+
+            const iconicMatch = content.match(/^(?:ict|rict)(?:\s+(.+))?$/i);
+            if (iconicMatch) {
+                const { handleIconicCountCommand } = require('../commands/iconic-count');
+                await handleIconicCountCommand(message, iconicMatch[1] ? iconicMatch[1].trim().split(/\s+/) : []);
+                return;
+            }
             
             // Setpog command: @bot setpog #channel or @bot setpog channelId
             const setpogMatch = content.match(/^setpog(?:\s+(.+))?$/i);
@@ -319,6 +326,12 @@ module.exports = {
             if (command === 'config') {
                 const { handleConfigCommand } = require('../commands/config');
                 await handleConfigCommand(message);
+                return;
+            }
+
+            if (command === 'ict' || command === 'rict') {
+                const { handleIconicCountCommand } = require('../commands/iconic-count');
+                await handleIconicCountCommand(message, args.slice(1));
                 return;
             }
 

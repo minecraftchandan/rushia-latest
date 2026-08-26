@@ -10,7 +10,8 @@ const botSettingsSchema = new mongoose.Schema({
   tier4RoleId: { type: String },
   multiRoleEnabled: { type: Boolean, default: false, index: true },
   delays: { type: Map, of: Number, default: new Map() },
-  luviEnabled: { type: Boolean, default: false, index: true }
+  luviEnabled: { type: Boolean, default: false, index: true },
+  address: { type: String, default: null, index: true }
 }, { timestamps: false });
 
 module.exports = mongoose.model('BotSettings', botSettingsSchema, 'guilds');
