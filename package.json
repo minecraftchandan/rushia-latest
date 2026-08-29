@@ -15,6 +15,7 @@
     "invite": "node dev/scripts/deploy/generate-invite.js",
     "inspect": "node dev/tests/message-inspector.js",
     "inspect-bot": "node tools/embed-inspector-bot.js",
+    "audit-iconic": "node tools/iconic-thread-audit-bot.js --thread-id=1459524406832529584",
     "seed": "node dev/scripts/seedDatabase.js"
   },
   "dependencies": {

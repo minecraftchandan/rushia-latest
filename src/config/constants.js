@@ -29,7 +29,7 @@ module.exports = {
   
   TIERS: ['t1', 't2', 't3', 't4'],
 
-  RAID_PING_COOLDOWN_SECONDS: 30 * 60,
+  RAID_PING_COOLDOWN_SECONDS: 5 * 60,
 
   RAID_ELEMENT_EMOJIS: [
     { key: 'light', emojiName: 'LU_LightElement', aliases: ['light'] },

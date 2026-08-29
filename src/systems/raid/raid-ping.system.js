@@ -70,32 +70,76 @@ function extractLeaderId(message) {
   return extractPartyLeaderId(message) || extractTriggerUserId(message);
 }
 
+function normalizeElements(elements) {
+  return [...new Set((Array.isArray(elements) ? elements : [elements])
+    .filter(Boolean)
+    .map(element => String(element).trim())
+    .filter(Boolean))];
+}
+
+function getRaidRoleId(guildRoles, element) {
+  if (!guildRoles?.roles) return null;
+  if (guildRoles.roles[element]) return guildRoles.roles[element];
+  if ((element === 'neutral' || element === 'normal') && guildRoles.roles.normal) return guildRoles.roles.normal;
+  if ((element === 'normal' || element === 'neutral') && guildRoles.roles.neutral) return guildRoles.roles.neutral;
+  return null;
+}
+
+function extractEmojiNamesFromText(text) {
+  if (!text) return new Set();
+
+  const matches = new Set();
+  for (const match of text.matchAll(/<:([^:>]+):\d+>/g)) {
+    if (match[1]) matches.add(match[1]);
+  }
+  for (const match of text.matchAll(/!?:?\[?:?([^:\]]+):?\]\([^)]*\)/g)) {
+    if (match[1]) matches.add(match[1]);
+  }
+  for (const match of text.matchAll(/:([A-Za-z0-9_]+):/g)) {
+    if (match[1]) matches.add(match[1]);
+  }
+
+  return matches;
+}
+
 function extractElements(embed) {
   if (!embed) return [];
 
-  const fields = embed.fields || [];
-  const elementsField = fields.find(field => /elements/i.test(`${field.name || ''} ${field.value || ''}`));
-  const text = [embed.title, embed.description, elementsField?.value, elementsField?.name]
-    .filter(Boolean)
+  const fields = Array.isArray(embed.fields) ? embed.fields : [];
+  const text = [
+    embed.title,
+    embed.description,
+    ...fields.map(field => `${field.name || ''} ${field.value || ''}`),
+    embed.footer?.text
+  ]
+    .filter(value => typeof value === 'string' && value.trim())
     .join(' ')
     .toLowerCase();
-  const emojiNames = new Set(
-    [...text.matchAll(/<:([^:>]+):\d+>/g)].map(match => match[1])
-  );
 
-  return RAID_ELEMENT_EMOJIS
-    .filter(element => emojiNames.has(element.emojiName) ||
-      element.aliases.some(alias => new RegExp(`\\b${alias}\\b`, 'i').test(text)))
-    .map(element => element.key);
+  if (!text) return [];
+
+  const emojiNames = extractEmojiNamesFromText(text);
+  const matches = RAID_ELEMENT_EMOJIS.filter(element => {
+    const emojiName = element.emojiName.toLowerCase();
+    if (emojiNames.has(element.emojiName) || emojiNames.has(emojiName)) return true;
+    if (emojiNames.has(element.emojiName.replace(/_/g, '').toLowerCase())) return true;
+    return element.aliases.some(alias => {
+      const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b${escapedAlias}\\b`, 'i').test(text);
+    });
+  }).map(element => element.key);
+
+  return normalizeElements(matches);
 }
 
 function isRaidEmbed(message) {
   return message.embeds?.some(embed => {
     const hasPartyMembers = (embed.fields || []).some(field => /party members/i.test(field.name || ''));
-    const hasElements = (embed.fields || []).some(field => /elements/i.test(`${field.name || ''} ${field.value || ''}`));
+    const hasElementInfo = (embed.fields || []).some(field => /element(?:s)?/i.test(`${field.name || ''} ${field.value || ''}`));
     const hasRaidId = /\bID:\s*\d+/i.test(embed.footer?.text || '');
     const isWaitingToStart = /waiting for the raid leader to begin the raid/i.test(embed.description || '');
-    return hasPartyMembers && hasElements && hasRaidId && isWaitingToStart;
+    const hasElementText = /\belement(?:s)?\b/i.test([embed.title, embed.description, ...(embed.fields || []).map(field => `${field.name || ''} ${field.value || ''}`)].join(' '));
+    return hasPartyMembers && (hasElementInfo || hasElementText) && hasRaidId && isWaitingToStart;
   });
 }
 
@@ -130,7 +174,7 @@ async function handleRaidPingMessage(message) {
   const triggerUserId = extractTriggerUserId(message);
   const leaderId = extractPartyLeaderId(message) || triggerUserId;
   const raidId = extractRaidId(message);
-  const raidElements = message.embeds.flatMap(extractElements);
+  const raidElements = normalizeElements(message.embeds.flatMap(extractElements));
   if (!triggerUserId) {
     return false;
   }
@@ -150,7 +194,7 @@ async function handleRaidPingMessage(message) {
   const roles = raidElements
     .map(element => ({
       element,
-      roleId: guildRoles.roles?.[element] || (element === 'neutral' ? guildRoles.roles?.normal : null)
+      roleId: getRaidRoleId(guildRoles, element)
     }))
     .filter(item => item.roleId);
   if (roles.length === 0) {
@@ -198,7 +242,7 @@ async function validateAndPingRoles(raidElements, guildRoles, channel) {
   const roleMentions = [];
 
   for (const element of raidElements) {
-    const roleId = guildRoles?.roles?.[element] || (element === 'neutral' ? guildRoles?.roles?.normal : null);
+    const roleId = getRaidRoleId(guildRoles, element);
     if (!roleId) {
       missingRoles.push(element);
       continue;
@@ -231,7 +275,7 @@ async function handleRaidPingReaction(reaction, user) {
   const guildRoles = await GuildRoles.findForGuild(message.guild.id);
   if (!guildRoles || !isRaidEmbed(message)) return false;
 
-  const raidElements = message.embeds.flatMap(extractElements);
+  const raidElements = normalizeElements(message.embeds.flatMap(extractElements));
   if (raidElements.length === 0) return false;
 
   const raidId = extractRaidId(message);
@@ -290,10 +334,8 @@ async function handleRaidSummonButton(interaction) {
     return true;
   }
 
-  const raidElements = sourceMessage.embeds.flatMap(extractElements);
-  const roles = raidElements.map(element =>
-    guildRoles?.roles?.[element] || (element === 'neutral' ? guildRoles?.roles?.normal : null)
-  ).filter(Boolean);
+  const raidElements = normalizeElements(sourceMessage.embeds.flatMap(extractElements));
+  const roles = raidElements.map(element => getRaidRoleId(guildRoles, element)).filter(Boolean);
   if (roles.length === 0) {
     await interaction.reply({ content: 'No element roles are configured for this raid.', ephemeral: true });
     return true;
