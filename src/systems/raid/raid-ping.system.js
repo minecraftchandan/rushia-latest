@@ -35,7 +35,7 @@ function extractRaidId(message) {
     const match = (embed.footer?.text || '').match(/\bID:\s*(\d+)/i);
     if (match) return match[1];
   }
-  return null;
+  return messageComponentText(message).match(/\bID:\s*(\d+)/i)?.[1] || null;
 }
 
 function extractPartyLeaderId(message) {
@@ -44,7 +44,8 @@ function extractPartyLeaderId(message) {
     const leaderMatch = partyField?.value?.match(/<@!?(\d+)>[^\n]*Party Leader/i);
     if (leaderMatch) return leaderMatch[1];
   }
-  return null;
+  const leaderMatch = messageComponentText(message).match(/<@!?(\d+)>[^\n]*Party Leader/i);
+  return leaderMatch?.[1] || null;
 }
 
 function extractPartyMemberIds(message) {
@@ -56,7 +57,24 @@ function extractPartyMemberIds(message) {
       if (match[1]) memberIds.add(match[1]);
     }
   }
+  const partyText = messageComponentText(message);
+  for (const match of partyText.matchAll(/<@!?(\d+)>/g)) {
+    if (match[1]) memberIds.add(match[1]);
+  }
   return memberIds;
+}
+
+function messageComponentText(message) {
+  const text = [];
+  const collect = components => {
+    for (const component of components || []) {
+      if (typeof component.content === 'string') text.push(component.content);
+      collect(component.components);
+    }
+  };
+
+  collect(message.components);
+  return text.join('\n');
 }
 
 function extractTriggerUserId(message) {
@@ -120,7 +138,7 @@ function extractEmojiNamesFromText(text) {
   if (!text) return new Set();
 
   const matches = new Set();
-  for (const match of text.matchAll(/<:([^:>]+):\d+>/g)) {
+  for (const match of text.matchAll(/<a?:([^:>]+):\d+>/g)) {
     if (match[1]) matches.add(match[1]);
   }
   for (const match of text.matchAll(/!?:?\[?:?([^:\]]+):?\]\([^)]*\)/g)) {
@@ -164,7 +182,7 @@ function extractElements(embed) {
 }
 
 function isRaidEmbed(message) {
-  return message.embeds?.some(embed => {
+  const hasLegacyRaid = message.embeds?.some(embed => {
     const hasPartyMembers = (embed.fields || []).some(field => /party members/i.test(field.name || ''));
     const hasElementInfo = (embed.fields || []).some(field => /element(?:s)?/i.test(`${field.name || ''} ${field.value || ''}`));
     const hasRaidId = /\bID:\s*\d+/i.test(embed.footer?.text || '');
@@ -172,11 +190,19 @@ function isRaidEmbed(message) {
     const hasElementText = /\belement(?:s)?\b/i.test([embed.title, embed.description, ...(embed.fields || []).map(field => `${field.name || ''} ${field.value || ''}`)].join(' '));
     return hasPartyMembers && (hasElementInfo || hasElementText) && hasRaidId && isWaitingToStart;
   });
+
+  if (hasLegacyRaid) return true;
+
+  const componentText = messageComponentText(message);
+  return /party members/i.test(componentText) &&
+    /elements?/i.test(componentText) &&
+    /\bID:\s*\d+/i.test(componentText) &&
+    /waiting for the raid leader to begin the raid/i.test(componentText);
 }
 
 async function handleRaidPingMessage(message) {
   if (!message.guild || message.author?.id !== LUVI_BOT_ID) return false;
-  if (!message.embeds?.length) {
+  if (!message.embeds?.length && !message.components?.length) {
     if (pendingRaidFetches.has(message.id)) return false;
     pendingRaidFetches.add(message.id);
 
@@ -205,7 +231,10 @@ async function handleRaidPingMessage(message) {
   const triggerUserId = extractTriggerUserId(message);
   const leaderId = extractPartyLeaderId(message) || triggerUserId;
   const raidId = extractRaidId(message);
-  const raidElements = normalizeElements(message.embeds.flatMap(extractElements));
+  const raidElements = normalizeElements([
+    ...message.embeds.flatMap(extractElements),
+    ...extractElements({ description: messageComponentText(message) })
+  ]);
 
   if (!triggerUserId || !leaderId) {
     return false;
@@ -444,7 +473,10 @@ async function handleRaidSummonButton(interaction) {
     return true;
   }
 
-  const raidElements = normalizeElements(sourceMessage.embeds.flatMap(extractElements));
+  const raidElements = normalizeElements([
+    ...sourceMessage.embeds.flatMap(extractElements),
+    ...extractElements({ description: messageComponentText(sourceMessage) })
+  ]);
   const roles = raidElements.map(element => getRaidRoleId(guildRoles, element)).filter(Boolean);
   if (roles.length === 0) {
     await interaction.reply({ content: 'No element roles are configured for this raid.', ephemeral: true });

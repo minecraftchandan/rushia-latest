@@ -18,6 +18,11 @@ module.exports = {
     async execute(message) {
         const client = message.client;
 
+        if (!message.author.bot) {
+            const { processBirthdayMessage } = require('../systems/bithday-system');
+            await processBirthdayMessage(message);
+        }
+
         if (!message.author.bot && message.mentions.users.has(LUVI_BOT_ID)) {
             const { trackRaidTrigger } = require('../systems/raid/raid-ping.system');
             trackRaidTrigger(message);
@@ -30,6 +35,13 @@ module.exports = {
             const mentionRegex = new RegExp(`^<@!?${client.user.id}>\\s*`, 'i');
             const content = message.content.replace(mentionRegex, '').trim();
             message.commandContent = content;
+
+            const birthdayCommand = content.match(/^hbd(?:\s+<@&(\d+)>)?$/i);
+            if (birthdayCommand) {
+                const { handleBirthdayCommand } = require('../systems/bithday-system');
+                await handleBirthdayCommand(message, message.mentions.roles.first());
+                return;
+            }
 
             if (content.match(/^raidconfig$/i)) {
                 const { handleRaidConfigCommand } = require('../commands/raidconfig');
