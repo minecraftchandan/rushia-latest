@@ -6,6 +6,18 @@ const RAID_TRIGGER_TTL_MS = 10 * 1000;
 const announcedRaidMessages = new Map();
 const ANNOUNCEMENT_DEDUPE_MS = 35 * 1000;
 const pendingRaidFetches = new Set();
+const RAID_BELL_REACTION_ID = '1543250637477781534';
+const RAID_BELL_EMOJI = '<a:bell:1543250637477781534>';
+
+function isRaidBellReaction(reaction) {
+  const emoji = reaction?.emoji;
+  if (!emoji) return false;
+  const emojiString = emoji.toString ? emoji.toString() : '';
+  return emoji.id === RAID_BELL_REACTION_ID ||
+    emojiString === RAID_BELL_EMOJI ||
+    emoji.name === 'bell' ||
+    emoji.name === 'a:bell';
+}
 
 function trackRaidTrigger(message) {
   if (message.author?.bot || !message.guild || !message.mentions?.users?.has(LUVI_BOT_ID)) return false;
@@ -226,6 +238,23 @@ async function handleRaidPingMessage(message) {
       allowedMentions: { users: [leaderId], roles: [] }
     });
 
+    try {
+      const alreadyHasBell = message.reactions?.cache?.some(reaction => isRaidBellReaction({ emoji: reaction.emoji }));
+      if (!alreadyHasBell) {
+        try {
+          await message.react(RAID_BELL_EMOJI);
+        } catch (customError) {
+          console.error('[RAID_PING] BELL_REACTION_FAILED', {
+            messageId: message.id,
+            guildId: message.guild?.id,
+            customError: customError.message
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[RAID_PING] BELL_REACTION_FAILED', { messageId: message.id, guildId: message.guild?.id, error: error.message });
+    }
+
     setTimeout(() => {
       announcedRaidMessages.delete(message.id);
       announcementMessage.delete().catch(() => {});
@@ -269,21 +298,53 @@ async function validateAndPingRoles(raidElements, guildRoles, channel) {
 
 async function handleRaidPingReaction(reaction, user) {
   const message = reaction.message;
-  if (user.bot || reaction.emoji.name !== '🔔' || !message.guild || message.author?.id !== LUVI_BOT_ID) return false;
+  console.log('[RAID_PING] REACTION_CLICK', {
+    userId: user.id,
+    userTag: user.tag,
+    emoji: reaction.emoji?.name || reaction.emoji?.id || reaction.emoji?.toString?.(),
+    guildId: message?.guild?.id,
+    channelId: message?.channel?.id,
+    messageId: message?.id,
+    authorId: message?.author?.id,
+    raidId: extractRaidId(message),
+    leaderId: extractLeaderId(message)
+  });
+
+  if (user.bot || (reaction.emoji.name !== RAID_BELL_EMOJI && !isRaidBellReaction(reaction)) || !message.guild || message.author?.id !== LUVI_BOT_ID) return false;
+
+  const leaderId = extractLeaderId(message);
+  if (leaderId && user.id === leaderId) {
+    console.log('[RAID_PING] BLOCKED_LEADER_REACTION', { userId: user.id, raidId: extractRaidId(message), leaderId });
+    return false;
+  }
 
   const { GuildRoles } = require('../../database/raid-ping.model');
   const guildRoles = await GuildRoles.findForGuild(message.guild.id);
-  if (!guildRoles || !isRaidEmbed(message)) return false;
+  if (!guildRoles || !isRaidEmbed(message)) {
+    console.log('[RAID_PING] BLOCKED_INVALID_GUILD_OR_EMBED', {
+      guildConfigured: !!guildRoles,
+      isRaidEmbed: isRaidEmbed(message),
+      raidId: extractRaidId(message)
+    });
+    return false;
+  }
 
   const raidElements = normalizeElements(message.embeds.flatMap(extractElements));
-  if (raidElements.length === 0) return false;
+  if (raidElements.length === 0) {
+    console.log('[RAID_PING] BLOCKED_NO_ELEMENTS', { raidId: extractRaidId(message), text: message.embeds?.map(e => e.description || e.title || '').join(' | ') });
+    return false;
+  }
 
   const raidId = extractRaidId(message);
-  if (!raidId) return false;
+  if (!raidId) {
+    console.log('[RAID_PING] BLOCKED_NO_RAID_ID', { messageId: message.id });
+    return false;
+  }
 
   const { Raid } = require('../../database/raid-ping.model');
   try {
     await Raid.create({ raidId, elements: raidElements });
+    console.log('[RAID_PING] RAID_CREATED', { raidId, elements: raidElements, userId: user.id });
   } catch (error) {
     if (error?.code === 11000) {
       const existingRaid = await Raid.findOne({ raidId }).lean();
@@ -292,27 +353,37 @@ async function handleRaidPingReaction(reaction, user) {
         : new Date(Date.now() + RAID_PING_COOLDOWN_SECONDS * 1000);
       const remainingSeconds = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000));
       const remainingMinutes = Math.ceil(remainingSeconds / 60);
+      console.log('[RAID_PING] DUPLICATE_PING_BLOCKED', { raidId, userId: user.id, expiresAt: expiresAt.toISOString(), remainingMinutes });
       await message.channel.send({
         content: `<@${user.id}> This raid was already pinged. You can ping it again <t:${Math.floor(expiresAt.getTime() / 1000)}:R> (about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} remaining).`,
         allowedMentions: { users: [user.id] }
       });
       return true;
     }
+    console.error('[RAID_PING] RAID_CREATE_FAILED', { raidId, userId: user.id, error: error.message });
     throw error;
   }
 
   let result;
   try {
     result = await validateAndPingRoles(raidElements, guildRoles, message.channel);
+    console.log('[RAID_PING] PING_RESULT', { raidId, sent: result.sent, missing: result.missing, userId: user.id });
   } catch (error) {
     await Raid.deleteOne({ raidId }).catch(() => {});
+    console.error('[RAID_PING] VALIDATE_AND_PING_FAILED', { raidId, userId: user.id, error: error.message });
     throw error;
   }
   if (result.sent.length === 0) {
     await Raid.deleteOne({ raidId }).catch(() => {});
+    console.log('[RAID_PING] NO_SENT_ROLES', { raidId, missing: result.missing, userId: user.id });
     return false;
   }
 
+  try {
+    await reaction.users.remove(user.id).catch(() => {});
+  } catch (error) {}
+
+  console.log('[RAID_PING] SUCCESS', { raidId, sent: result.sent, userId: user.id });
   return true;
 }
 

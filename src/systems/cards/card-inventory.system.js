@@ -81,13 +81,20 @@ function extractCardsWithIds(embed) {
     return cards;
 }
 
-function startPaginationWatcher(userId, inventoryMessage, cardListMessage) {
+function startPaginationWatcher(userId, inventoryMessage, cardListMessage, initialCards = {}) {
     if (watchers.has(userId)) {
         clearInterval(watchers.get(userId).interval);
     }
 
     let allCards = {};
     let seenIds = new Set();
+    Object.entries(initialCards).forEach(([rarity, cards]) => {
+        allCards[rarity] = cards.map(card => ({ ...card }));
+        cards.forEach(card => {
+            if (card.id) seenIds.add(card.id);
+        });
+    });
+
     let lastPage = 1;
     let isActive = true;
     const startTime = Date.now();
@@ -179,10 +186,34 @@ function startPaginationWatcher(userId, inventoryMessage, cardListMessage) {
     watchers.set(userId, { interval, allCards });
 }
 
+async function handleInventoryReaction(reaction, user) {
+    if (user.bot || reaction.emoji.name !== '✏️' || !reaction.message?.guild) return false;
+    if (reaction.message.author?.id !== LUVI_BOT_ID) return false;
+    if (!reaction.message.embeds?.length) return false;
+
+    const inventoryMessage = reaction.message;
+    const initialCards = extractCardsWithIds(inventoryMessage.embeds[0]);
+    const initialContent = buildRarityMessage(initialCards) || 'No cards found.';
+    const cardListMessage = await inventoryMessage.channel.send({
+        content: initialContent
+    }).catch(() => null);
+
+    if (!cardListMessage) return false;
+
+    startPaginationWatcher(user.id, inventoryMessage, cardListMessage, initialCards);
+    try {
+        await reaction.users.remove(user.id);
+    } catch (error) {
+        sendError('Failed to remove inventory reaction:', error);
+    }
+
+    return true;
+}
+
 async function handleCardInventorySystem(client) {
     client.on(Events.MessageCreate, async (message) => {
         await processInventoryMessage(message);
     });
 }
 
-module.exports = { handleCardInventorySystem, startPaginationWatcher };
+module.exports = { handleCardInventorySystem, handleInventoryReaction, startPaginationWatcher };
