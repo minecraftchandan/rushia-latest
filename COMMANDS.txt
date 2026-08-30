@@ -5,16 +5,10 @@ Use any of the commands below in Discord.
 
 General bot commands
 --------------------
-- @Rushia help
-  Shows this help list.
 
-- @Rushia stats
-  Shows bot uptime, memory, server count, and database status.
 
-- @Rushia minfo
-  Displays the current POG alert setup for the server.
 
-- rconfig
+- rconfig/@Rushia config
   Alias for config.
 
 
@@ -76,9 +70,6 @@ Notification and reminder commands
 
 
 
-- @Rushia nv
-  Views your notification settings.
-
 
 Wishlist and card commands
 --------------------------
@@ -91,8 +82,6 @@ Wishlist and card commands
 - @Rushia wr <card name>
   Removes a card from your wishlist.
 
-- @Rushia find <query>
-  Alias for f.
 
 - /suggestion <suggestion>
   Sends a suggestion directly to the bot owner.
@@ -126,6 +115,19 @@ How the leaderboard commands relate to each other:
 - rlb is the main leaderboard menu.
 - rdlb, rrlb, rclb, and rilb are direct shortcuts to each leaderboard category.
 - All of them use the same leaderboard system, but each one shows a different tracked stat.
+
+
+Reaction features
+-----------------
+- ✏️ Pencil reaction
+  Opens the card inventory / edit view for the user linked to the message.
+  This is used for managing cards and checking the inventory from a bot post.
+
+- <a:bell:1543246602074849280> Bell reaction
+  Used on valid raid embed messages.
+  - Raid members can react to ping the matching element roles.
+  - Non-members get their reaction removed and are warned in the channel: "mat kr lala mat kr".
+  - The raid leader sees the summon UI instead of the bell ping flow.
 
 
 Giveaway commands

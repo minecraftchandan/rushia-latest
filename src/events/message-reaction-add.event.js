@@ -20,7 +20,7 @@ module.exports = {
             return;
         }
 
-        if (reaction.emoji.id === '1543250637477781534' || reaction.emoji.name === 'bell' || reaction.emoji.name === 'a:bell') {
+        if (reaction.emoji.id === '1543246602074849280' || reaction.emoji.name === 'bell' || reaction.emoji.name === 'a:bell') {
             await handleRaidPingReaction(reaction, user);
         }
     }

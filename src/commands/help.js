@@ -1,193 +1,482 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  PermissionFlagsBits,
+  MessageFlags
+} = require('discord.js');
+const { BOT_OWNER_ID } = require('../config/constants');
 
-const helpCategories = {
+// ---------- command type badges ----------
+const CMD_TYPE = {
+  SLASH: 'slash',
+  PREFIX: 'prefix',
+  MENTION: 'mention',
+  REACTION: 'reaction'
+};
+
+const CMD_TYPE_BADGE = {
+  [CMD_TYPE.SLASH]: '💬',
+  [CMD_TYPE.PREFIX]: '⌨️',
+  [CMD_TYPE.MENTION]: '🤖',
+  [CMD_TYPE.REACTION]: '🖱️'
+};
+
+function badge(type) {
+  return CMD_TYPE_BADGE[type] || '';
+}
+
+// ---------- category command data ----------
+// Each category has `sections`, each section has a name and a list of commands.
+// Each command: { type, command, description, types (optional badge list for multi-value args) }
+const HELP_CATEGORIES = {
   overview: {
-    title: '🤖 Rushia Bot - Overview',
-    description: 'Welcome to Rushia Bot! Select a category from the dropdown below to learn more.',
-    fields: [
-      { name: '📋 Admin Commands', value: 'Server configuration and role management', inline: true },
-      { name: '👤 User Commands', value: 'Personal notification settings', inline: true },
-      { name: '🔍 Card Search', value: 'Search through 1000+ cards', inline: true },
-      { name: '📊 Leaderboard', value: 'View drop statistics', inline: true },
-      { name: '📦 Inventory Helper', value: 'Interactive inventory management', inline: true },
-      { name: '💝 Wishlist System', value: 'Track your wanted cards', inline: true },
-      { name: '🎉 POG Alerts', value: 'High-value drop notifications', inline: true },
-      { name: '🔧 Auto Features', value: 'Automatic detection and reminders', inline: true }
+    title: '🌸 RUSHIA BOT — HELP CENTER',
+    description: 'Welcome to Rushia! Your guide to commands, raids, notifications, cards, leaderboards and server tools.',
+    stats: [
+      { icon: '📌', title: 'Commands', sub: '30+ commands' },
+      { icon: '⚙️', title: 'Server', sub: 'Configuration & roles' },
+      { icon: '🔔', title: 'Notifications', sub: 'Reminders & DMs' },
+      { icon: '🎴', title: 'Cards', sub: 'Wishlist & inventory' },
+      { icon: '🏆', title: 'Leaderboards', sub: 'Drops, clash & iconic' },
+      { icon: '⚔️', title: 'Raids', sub: 'Raid roles & alerts' },
+      { icon: '🎁', title: 'Giveaways', sub: 'Giveaway configuration' },
+      { icon: '🛠️', title: 'Utilities', sub: 'Admin & tools' }
     ]
   },
-  admin: {
-    title: '📋 Admin Commands',
-    description: '*Requires Manage Roles permission*',
-    fields: [
-      { name: '/set-boss-role [role]', value: 'Set or remove role to ping for all boss spawns' },
-      { name: '/multi-roles enable', value: 'Enable separate roles for each boss tier (1, 2, 3)' },
-      { name: '/multi-roles disable', value: 'Use single role for all boss tiers' },
-      { name: 'rsetpog <#channel>', value: 'Set channel for POG alerts\n**Usage:** `rsetpog #pog-alerts` or `@bot setpog #pog-alerts`' },
-      { name: '/set-pog-channel', value: 'Set channel for POG alerts (use #channel or channel ID)' },
-      { name: '/view-settings', value: 'View current boss role configuration' }
+  server: {
+    title: '⚙️ SERVER SETUP',
+    description: "Configure Rushia's server-wide features, roles and alerts.",
+    sections: [
+      {
+        name: '👑 Boss Roles',
+        commands: [
+          { type: CMD_TYPE.SLASH, command: '/view-settings', description: 'View current boss role configuration.' },
+          { type: CMD_TYPE.SLASH, command: '/set-boss-role [role]', description: 'Set or remove the global boss ping role.' },
+          { type: CMD_TYPE.SLASH, command: '/multi-roles enable', description: 'Enable separate roles for each boss tier.' },
+          { type: CMD_TYPE.SLASH, command: '/multi-roles disable', description: 'Disable multi-role mode and use a single boss role.' },
+          { type: CMD_TYPE.SLASH, command: '/multi-roles set-boss <tier> [role]', description: 'Assign a role to a specific boss tier.' }
+        ]
+      },
+      {
+        name: '📊 Other Server Settings',
+        commands: [
+          { type: CMD_TYPE.MENTION, command: '@Rushia ict [#channel|channelId|none]', description: 'Restrict iconic counting to one channel.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia raidconfig', description: 'Configure raid roles.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia setpog [#channel]', description: 'Configure POG alert channel.' }
+        ]
+      },
+      {
+        name: '🧩 Admin Panel',
+        commands: [
+          { type: CMD_TYPE.SLASH, command: '/config', description: 'Open the full admin configuration panel.', highlight: true }
+        ]
+      }
     ]
   },
-  user: {
-    title: '👤 User Commands',
-    description: 'Manage your personal notification preferences',
-    fields: [
-      { name: '/notifications view', value: 'View your current notification settings' },
-      { name: '/notifications set', value: 'Enable/disable notifications\n**Types:** expedition, stamina, raid, raidSpawnReminder, drop' },
-      { name: '/dm enable <type>', value: 'Receive reminders via DM\n**Types:** expedition, stamina, raidSpawn, drop' },
-      { name: '/dm disable <type>', value: 'Receive reminders in channel instead of DM' },
-      { name: '@bot here', value: 'Redirect YOUR raid reminders to current channel for 2 hours\n-# ⚠️ Use AFTER attacking a raid (updates existing reminders)' },
-      { name: '/suggestion', value: 'Send a suggestion to the bot owner (max 1000 chars)' }
-    ]
-  },
-  search: {
-    title: '🔍 Card Search',
-    description: 'Search through 1000+ cards using mentions',
-    fields: [
-      { name: 'Usage', value: '`@bot f <query>` or `@bot find <query>`' },
-      { name: 'Examples', value: '• `@bot f naruto` - Find Naruto characters\n• `@bot find fire duelist` - Find fire duelist cards\n• `@bot f bleach ice` - Find ice cards from Bleach' },
-      { name: 'Multiple Results', value: 'Type number (1, 2, 3) to select from results' },
-      { name: 'Single Result', value: 'Shows card details directly' }
-    ]
-  },
-  leaderboard: {
-    title: '📊 Drop Leaderboard',
-    description: 'View server drop statistics and rankings',
-    fields: [
-      { name: 'Usage', value: '`rlb` or `@bot rlb`' },
-      { name: 'Features', value: '• Top 10 droppers with total drop counts\n• "Rare Drops" button for Exotic/Legendary stats\n• Admin/Owner can paginate and reset leaderboard' },
-      { name: 'Tracking', value: 'Automatically tracks all drops in your server' }
-    ]
-  },
-  inventory: {
-    title: '📦 Inventory Helper',
-    description: 'Interactive inventory management system',
-    fields: [
-      { name: '🔍 Command Builder', value: 'React with 🔍 to build custom inventory commands with card selections and filters' },
-      { name: '✏️ Card Scraper', value: 'React with ✏️ to extract and organize all cards by rarity from your inventory' },
-      { name: 'Features', value: '• Select cards from dropdown\n• Add/remove cards to command\n• Configure filters (rarity, element, type)\n• Auto-updates when you change pages' },
-      { name: 'Auto-React', value: 'Bot automatically reacts with 🔍 and ✏️ on inventory embeds' }
+  notifications: {
+    title: '🔔 NOTIFICATIONS & REMINDERS',
+    description: 'Manage your personal notifications, reminders and DM alerts.',
+    sections: [
+      {
+        name: '🔔 Notification Preferences',
+        commands: [
+          { type: CMD_TYPE.SLASH, command: '/notifications view', description: 'View current notification preferences.' },
+          { type: CMD_TYPE.SLASH, command: '/notifications set <type> <enabled>', description: 'Enable or disable a notification type.', typeBadges: ['expedition', 'stamina', 'raid', 'raidSpawnReminder', 'drop'] }
+        ]
+      },
+      {
+        name: '📩 Direct Messages',
+        commands: [
+          { type: CMD_TYPE.SLASH, command: '/dm enable <type>', description: 'Enable DM reminders.' },
+          { type: CMD_TYPE.SLASH, command: '/dm disable <type>', description: 'Disable DM reminders.', typeBadges: ['expedition', 'stamina', 'raidSpawn', 'drop'] }
+        ]
+      },
+      {
+        name: '⚡ Temporary Raid Channel',
+        commands: [
+          { type: CMD_TYPE.MENTION, command: '@Rushia here', description: 'Temporarily redirect raid reminders to the current channel.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia unhere', description: 'Clear the temporary reminder channel override.' }
+        ]
+      }
     ]
   },
   wishlist: {
-    title: '💝 Wishlist System',
-    description: 'Track your wanted cards to get notified when they spawn in raids',
-    fields: [
-      { name: 'wa <card name>', value: 'Add a card to your wishlist (max 10 cards)' },
-      { name: 'wl', value: 'View your current wishlist' },
-      { name: 'wr <card name>', value: 'Remove a card from your wishlist' }
+    title: '🎴 WISHLIST & CARDS',
+    description: 'Manage your wishlist and card inventory.',
+    sections: [
+      {
+        name: 'Wishlist',
+        commands: [
+          { type: CMD_TYPE.MENTION, command: '@Rushia wa <card name>', description: 'Add a card to your wishlist.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia wl [@user or userId]', description: "View your own or another user's wishlist." },
+          { type: CMD_TYPE.MENTION, command: '@Rushia wr <card name>', description: 'Remove a card from your wishlist.' }
+        ]
+      },
+      {
+        name: '✏️ Pencil Reaction',
+        commands: [
+          { type: CMD_TYPE.REACTION, command: '✏️ Pencil', description: 'Open the card inventory / edit view for the user linked to the message.' }
+        ]
+      }
     ]
   },
-  pog: {
-    title: '🎉 POG Alerts',
-    description: 'Automatic high-value drop detection and forwarding',
-    fields: [
-      { name: 'What is POG?', value: 'When Luvi drops cards with heart values over 99, the bot automatically forwards them to your configured channel with a special alert.' },
-      { name: 'Text Commands', value: '`@bot setpog #pog-alerts`\nor\n`rsetpog #pog-alerts`\n\nUse without channel to disable' },
-      { name: 'Features', value: '• Detects drops with hearts > 99\n• Animated embed with all heart values\n• "Jump to Message" button\n• Mentions the user who got the drop' },
-      { name: 'Series Hearts', value: 'Bot also shows heart values for series when Luvi posts series selection embeds' },
-      { name: 'Cache Management', value: 'Cache is automatically refreshed every 5 minutes' }
+  leaderboards: {
+    title: '🏆 LEADERBOARDS',
+    description: "Track Rushia's community statistics.",
+    sections: [
+      {
+        name: 'Main Hub',
+        commands: [
+          { type: CMD_TYPE.PREFIX, command: 'rlb', description: 'Main leaderboard hub.' }
+        ]
+      },
+      {
+        name: 'Select Leaderboard',
+        commands: [],
+        note: 'Use the category selector to switch between the major leaderboard views.\n**Options:** 🟡 Drops • 🔴 Rare Drops • ⚔️ Clash • ✨ Iconic'
+      },
+      {
+        name: 'Quick Commands',
+        commands: [
+          { type: CMD_TYPE.PREFIX, command: 'rdlb', description: 'Drop leaderboard.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia rrlb', description: 'Rare drop leaderboard.' },
+          { type: CMD_TYPE.PREFIX, command: 'rclb', description: 'Clash leaderboard.' },
+          { type: CMD_TYPE.PREFIX, command: 'rilb', description: 'Iconic leaderboard.' }
+        ]
+      }
     ]
   },
-  auto: {
-    title: '🔧 Automatic Features',
-    description: 'Features that work automatically in the background',
-    fields: [
-      { name: 'Boss Detection', value: 'Auto-detects all tier boss spawns and pings configured roles' },
-      { name: 'Stamina Reminders', value: 'Auto-reminds when stamina refills to configured percentage' },
-      { name: 'Expedition Reminders', value: 'Auto-reminds when expeditions complete' },
-      { name: 'Raid Reminders', value: 'Reminds when raid fatigue recovers + 30-min spawn reminder' },
-      { name: 'Channel Override', value: 'Use `@bot here` to redirect your raid reminders to any channel for 2 hours' },
-      { name: 'Drop Tracking', value: 'Tracks all drops and rare drops (Exotic/Legendary)' }
+  raids: {
+    title: '⚔️ RAIDS',
+    description: 'Manage raid roles, raid alerts and raid interactions.',
+    sections: [
+      {
+        name: '<a:bell:1543246602074849280> Raid Bell',
+        commands: [
+          { type: CMD_TYPE.REACTION, command: '<a:bell:1543246602074849280> Bell', description: 'React to a valid raid embed with the bell to ping the matching element role.', highlight: true }
+        ]
+      },
+      {
+        name: 'Raid Roles',
+        commands: [],
+        note: '👥 **Raid Member** — Can react to ping their matching element role.\n🚫 **Non-Member** — Reaction is removed, with a warning in-channel.\n👑 **Raid Leader** — Sees the summon UI instead of the normal bell flow.'
+      },
+      {
+        name: 'Raid Tools',
+        commands: [
+          { type: CMD_TYPE.MENTION, command: '@Rushia raidconfig', description: 'Configure raid roles.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia here', description: 'Temporarily redirect raid reminders.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia unhere', description: 'Clear the temporary override.' }
+        ]
+      }
+    ]
+  },
+  giveaways: {
+    title: '🎁 GIVEAWAYS',
+    description: 'Configure and manage Rushia giveaways.',
+    sections: [
+      {
+        name: 'Setup',
+        commands: [
+          { type: CMD_TYPE.MENTION, command: '@Rushia gawk set', description: 'Start giveaway configuration.' },
+          { type: CMD_TYPE.MENTION, command: '@Rushia gawk view', description: 'View the current giveaway configuration.' }
+        ]
+      }
+    ]
+  },
+  admin: {
+    title: '🛠️ ADMIN & UTILITIES',
+    description: 'Advanced commands available to authorized administrators.',
+    requiresAdmin: true,
+    sections: [
+      {
+        name: 'Leaderboard Admin',
+        commands: [
+          { type: CMD_TYPE.PREFIX, command: 'radd', description: 'Manually update leaderboard data.', admin: true },
+          { type: CMD_TYPE.PREFIX, command: 'rdel', description: 'Manually remove leaderboard data.', admin: true }
+        ]
+      },
+      {
+        name: 'Role Delays',
+        commands: [
+          { type: CMD_TYPE.PREFIX, command: 'rdelay <roleId> <time>', description: 'Delay a role action.', admin: true },
+          { type: CMD_TYPE.PREFIX, command: 'rdelays', description: 'View active delayed role jobs.', admin: true }
+        ]
+      },
+      {
+        name: 'Suggestions',
+        commands: [
+          { type: CMD_TYPE.SLASH, command: '/suggestion <suggestion>', description: 'Send a suggestion to the bot owner.' }
+        ]
+      }
     ]
   }
 };
 
+const HELP_OPTION_ORDER = ['overview', 'server', 'notifications', 'wishlist', 'leaderboards', 'raids', 'giveaways', 'admin'];
+const helpStateByUser = new Map();
+
+function getCategoryLabel(key) {
+  const labels = {
+    overview: '🌸 Overview',
+    server: '⚙️ Server Setup',
+    notifications: '🔔 Notifications',
+    wishlist: '🎴 Wishlist & Cards',
+    leaderboards: '🏆 Leaderboards',
+    raids: '⚔️ Raids',
+    giveaways: '🎁 Giveaways',
+    admin: '🛠️ Admin & Utilities'
+  };
+  return labels[key] || 'Help';
+}
+
+// A member "is admin" for the purposes of the Admin & Utilities category if
+// they can manage the guild, or are the bot owner (DMs / edge cases).
+function memberIsAdmin(interactionOrMessage) {
+  const member = interactionOrMessage.member;
+  const userId = interactionOrMessage.user?.id || interactionOrMessage.author?.id;
+  if (userId && userId === BOT_OWNER_ID) return true;
+  if (!member || !member.permissions) return false;
+  return member.permissions.has(PermissionFlagsBits.ManageGuild);
+}
+
+function visibleCategoryOrder(isAdmin) {
+  return isAdmin ? HELP_OPTION_ORDER : HELP_OPTION_ORDER.filter(key => !HELP_CATEGORIES[key].requiresAdmin);
+}
+
+function buildCategoryTextContent(categoryKey = 'overview') {
+  const category = HELP_CATEGORIES[categoryKey] || HELP_CATEGORIES.overview;
+
+  if (categoryKey === 'overview') {
+    const statLines = category.stats.map(stat => `${stat.icon} **${stat.title}** — ${stat.sub}`).join('\n');
+    return [
+      '## 🌸 RUSHIA BOT — HELP CENTER',
+      category.description,
+      '',
+      statLines
+    ].join('\n');
+  }
+
+  const sectionBlocks = (category.sections || []).map(section => {
+    const lines = [`### ${section.name}`];
+
+    if (section.note) {
+      lines.push(section.note);
+    }
+
+    for (const cmd of section.commands || []) {
+      const prefix = cmd.highlight ? '⭐ ' : '';
+      const adminTag = cmd.admin ? ' `ADMIN`' : '';
+      lines.push(`${badge(cmd.type)} \`${cmd.command}\`${adminTag}${prefix ? ` ${prefix}` : ''}`);
+      lines.push(cmd.description);
+      if (cmd.typeBadges?.length) {
+        lines.push(cmd.typeBadges.map(t => `\`${t}\``).join(' '));
+      }
+      lines.push('');
+    }
+
+    return lines.join('\n').trim();
+  }).join('\n\n');
+
+  return [`## ${category.title}`, category.description, '', sectionBlocks].join('\n');
+}
+
+function buildLegacyCategoryComponents(userId, category, previousCategory = 'overview', isAdmin = false) {
+  const options = visibleCategoryOrder(isAdmin).map(key => ({
+    label: getCategoryLabel(key),
+    value: key,
+    default: key === category,
+    description: key === 'overview' ? 'Main help page' : 'Command overview'
+  }));
+
+  const dropdown = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`help_category_${userId}`)
+      .setPlaceholder('📚 Select a category...')
+      .addOptions(options)
+  );
+
+  return [dropdown];
+}
+
+function buildCategoryComponents(userId, category, previousCategory = 'overview', isAdmin = false) {
+  const options = visibleCategoryOrder(isAdmin).map(key => ({
+    label: getCategoryLabel(key),
+    value: key,
+    default: key === category,
+    description: key === 'overview' ? 'Main help page' : 'Command overview'
+  }));
+
+  const dropdown = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`help_category_${userId}`)
+      .setPlaceholder('📚 Select a category...')
+      .addOptions(options)
+  );
+
+  const container = new ContainerBuilder()
+    .setAccentColor(0xD98FFF)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(buildCategoryTextContent(category))
+    );
+
+  if (category !== 'overview') {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+  }
+
+  container
+    .addActionRowComponents(dropdown);
+
+  return [container];
+}
+
+function buildHelpUpdatePayload(interaction, userId, category, previousCategory, isAdmin) {
+  if (interaction.message?.flags?.has(MessageFlags.IsComponentsV2)) {
+    return {
+      components: buildCategoryComponents(userId, category, previousCategory, isAdmin),
+      flags: MessageFlags.IsComponentsV2
+    };
+  }
+
+  return {
+    embeds: [buildHelpContentEmbed(category, previousCategory, interaction.client.user)],
+    components: buildLegacyCategoryComponents(userId, category, previousCategory, isAdmin)
+  };
+}
+
+function buildHelpEmbed(categoryKey = 'overview', previousCategory = 'overview', botUser = null) {
+  const category = HELP_CATEGORIES[categoryKey] || HELP_CATEGORIES.overview;
+  const embed = new EmbedBuilder()
+    .setTitle(category.title)
+    .setDescription(category.description)
+    .setColor(0xD98FFF)
+    .setFooter({
+      text: categoryKey === 'overview'
+        ? 'Use the menu below to find commands and features.'
+        : `Back: ${getCategoryLabel(previousCategory)}`
+    });
+
+  if (botUser) {
+    embed.setAuthor({
+      name: botUser.username,
+      iconURL: botUser.displayAvatarURL({ size: 128 })
+    });
+  }
+
+  if (categoryKey === 'overview') {
+    embed.addFields(category.stats.map(stat => ({ name: `${stat.icon} ${stat.title}`, value: stat.sub, inline: true })));
+  } else {
+    for (const section of category.sections || []) {
+      if (section.note) {
+        embed.addFields({ name: section.name, value: section.note, inline: false });
+      }
+      if (section.commands?.length) {
+        const value = section.commands.map(cmd => {
+          const adminTag = cmd.admin ? ' `ADMIN`' : '';
+          const typeBadges = cmd.typeBadges?.length ? `\n${cmd.typeBadges.map(t => `\`${t}\``).join(' ')}` : '';
+          return `${badge(cmd.type)} \`${cmd.command}\`${adminTag}\n${cmd.description}${typeBadges}`;
+        }).join('\n\n');
+        embed.addFields({ name: section.name, value, inline: false });
+      }
+    }
+  }
+
+  return embed;
+}
+
+function buildHelpContentEmbed(categoryKey = 'overview', previousCategory = 'overview', botUser = null) {
+  return buildHelpEmbed(categoryKey, previousCategory, botUser);
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Shows setup instructions for Rushia Bot'),
+    .setDescription('Shows the Rushia Bot help center'),
 
   async execute(interaction) {
-    const embed = new EmbedBuilder()
-      .setTitle(helpCategories.overview.title)
-      .setDescription(helpCategories.overview.description)
-      .addFields(helpCategories.overview.fields)
-      .setColor(0x0099ff)
-      .setFooter({ text: 'Select a category from the dropdown below' });
-
-    const dropdown = new ActionRowBuilder()
-      .addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId(`help_category_${interaction.user.id}`)
-          .setPlaceholder('Select a help category')
-          .addOptions([
-            { label: 'Overview', value: 'overview', emoji: '🤖', description: 'Main help page' },
-            { label: 'Admin Commands', value: 'admin', emoji: '📋', description: 'Server configuration' },
-            { label: 'User Commands', value: 'user', emoji: '👤', description: 'Personal settings' },
-            { label: 'Card Search', value: 'search', emoji: '🔍', description: 'Search cards' },
-            { label: 'Leaderboard', value: 'leaderboard', emoji: '📊', description: 'Drop statistics' },
-            { label: 'Inventory Helper', value: 'inventory', emoji: '📦', description: 'Inventory tools' },
-            { label: 'Wishlist System', value: 'wishlist', emoji: '💝', description: 'Track wanted cards' },
-            { label: 'POG Alerts', value: 'pog', emoji: '🎉', description: 'High-value drops' },
-            { label: 'Auto Features', value: 'auto', emoji: '🔧', description: 'Automatic features' }
-          ])
-      );
-
-    await interaction.reply({ embeds: [embed], components: [dropdown], ephemeral: true });
-  },
+    const isAdmin = memberIsAdmin(interaction);
+    helpStateByUser.set(interaction.user.id, 'overview');
+    const components = buildCategoryComponents(interaction.user.id, 'overview', 'overview', isAdmin);
+    await interaction.reply({
+      components,
+      flags: MessageFlags.IsComponentsV2,
+      ephemeral: true
+    });
+  }
 };
 
 async function handleHelpCategory(interaction) {
   if (!interaction.customId.startsWith('help_category_')) return false;
 
-  const userId = interaction.customId.split('_')[2];
+  const userId = interaction.customId.replace('help_category_', '');
   if (interaction.user.id !== userId) {
-    await interaction.reply({ content: 'This is not your help menu!', ephemeral: true });
+    await interaction.reply({ content: 'This help panel is not for you.', ephemeral: true });
     return true;
   }
 
+  const isAdmin = memberIsAdmin(interaction);
   const category = interaction.values[0];
-  const categoryData = helpCategories[category];
 
-  const embed = new EmbedBuilder()
-    .setTitle(categoryData.title)
-    .setDescription(categoryData.description)
-    .addFields(categoryData.fields)
-    .setColor(0x0099ff)
-    .setFooter({ text: 'Select another category to learn more' });
+  if (HELP_CATEGORIES[category]?.requiresAdmin && !isAdmin) {
+    await interaction.reply({ content: 'You need the **Manage Server** permission to view Admin & Utilities.', ephemeral: true });
+    return true;
+  }
 
-  await interaction.update({ embeds: [embed] });
+  const previousCategory = helpStateByUser.get(userId) || 'overview';
+  const nextCategory = category;
+  helpStateByUser.set(userId, nextCategory);
+  await interaction.update(buildHelpUpdatePayload(interaction, userId, nextCategory, previousCategory, isAdmin));
   return true;
 }
 
-module.exports.handleHelpCategory = handleHelpCategory;
+async function handleHelpButton(interaction) {
+  if (!interaction.customId.startsWith('help_')) return false;
 
-async function handleHelpCommand(message) {
-  const embed = new EmbedBuilder()
-    .setTitle(helpCategories.overview.title)
-    .setDescription(helpCategories.overview.description)
-    .addFields(helpCategories.overview.fields)
-    .setColor(0x0099ff)
-    .setFooter({ text: 'Select a category from the dropdown below' });
+  const [, action, userId, previousCategory] = interaction.customId.split('_');
+  if (!userId || interaction.user.id !== userId) {
+    await interaction.reply({ content: 'This help panel is not for you.', ephemeral: true });
+    return true;
+  }
 
-  const dropdown = new ActionRowBuilder()
-    .addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId(`help_category_${message.author.id}`)
-        .setPlaceholder('Select a help category')
-        .addOptions([
-          { label: 'Overview', value: 'overview', emoji: '🤖', description: 'Main help page' },
-          { label: 'Admin Commands', value: 'admin', emoji: '📋', description: 'Server configuration' },
-          { label: 'User Commands', value: 'user', emoji: '👤', description: 'Personal settings' },
-          { label: 'Card Search', value: 'search', emoji: '🔍', description: 'Search cards' },
-          { label: 'Leaderboard', value: 'leaderboard', emoji: '📊', description: 'Drop statistics' },
-          { label: 'Inventory Helper', value: 'inventory', emoji: '📦', description: 'Inventory tools' },
-          { label: 'Wishlist System', value: 'wishlist', emoji: '💝', description: 'Track wanted cards' },
-          { label: 'Auto Features', value: 'auto', emoji: '🔧', description: 'Automatic features' }
-        ])
-    );
+  const isAdmin = memberIsAdmin(interaction);
 
-  await message.reply({ embeds: [embed], components: [dropdown] });
+  if (action === 'home') {
+    helpStateByUser.set(userId, 'overview');
+    await interaction.update(buildHelpUpdatePayload(interaction, userId, 'overview', 'overview', isAdmin));
+    return true;
+  }
+
+  if (action === 'back') {
+    const targetCategory = previousCategory || helpStateByUser.get(userId) || 'overview';
+    if (HELP_CATEGORIES[targetCategory]?.requiresAdmin && !isAdmin) {
+      helpStateByUser.set(userId, 'overview');
+      await interaction.update(buildHelpUpdatePayload(interaction, userId, 'overview', 'overview', isAdmin));
+      return true;
+    }
+
+    helpStateByUser.set(userId, targetCategory);
+    await interaction.update(buildHelpUpdatePayload(interaction, userId, targetCategory, 'overview', isAdmin));
+    return true;
+  }
+
+  return false;
 }
 
+async function handleHelpCommand(message) {
+  const isAdmin = memberIsAdmin(message);
+  const embed = buildHelpContentEmbed('overview', 'overview', message.client.user);
+  const legacyComponents = buildLegacyCategoryComponents(message.author.id, 'overview', 'overview', isAdmin);
+  await message.reply({ embeds: [embed], components: legacyComponents });
+}
+
+module.exports.handleHelpCategory = handleHelpCategory;
+module.exports.handleHelpButton = handleHelpButton;
 module.exports.handleHelpCommand = handleHelpCommand;

@@ -48,6 +48,12 @@ module.exports = {
             }
         } else if (interaction.isStringSelectMenu()) {
             try {
+                // Handle help selections before other select-menu systems.
+                if (interaction.customId.startsWith('help_category_')) {
+                    const { handleHelpCategory } = require('../commands/help');
+                    if (await handleHelpCategory(interaction)) return;
+                }
+
                 const { handleGawkInteraction } = require('../commands/gawk');
                 if (await handleGawkInteraction(interaction)) return;
 
@@ -60,10 +66,12 @@ module.exports = {
 
                 const { handleReminderInteraction } = require('../utils/reminder.viewer');
                 if (await handleReminderInteraction(interaction)) return;
-                const { handleHelpCategory } = require('../commands/help');
-                if (await handleHelpCategory(interaction)) return;
             } catch (error) {
                 sendError('Error handling string select menu:', error);
+                console.error('[INTERACTION_SELECT_ERROR]', error);
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: 'There was an error handling this selection.', flags: 1 << 6 });
+                }
             }
         } else if (interaction.isMentionableSelectMenu()) {
             try {
@@ -76,26 +84,29 @@ module.exports = {
            try {
                const raidConfig = require('../commands/raidconfig');
                if (await raidConfig.handleModal(interaction)) return;
-
+ 
                const { handleGawkInteraction } = require('../commands/gawk');
                if (await handleGawkInteraction(interaction)) return;
            } catch (error) {
                sendError('Error handling modal submit:', error);
            }
         } else if (interaction.isButton()) {
-            try {
-                const { handleRaidSummonButton } = require('../systems/raid/raid-ping.system');
-                if (await handleRaidSummonButton(interaction)) return;
+           try {
+               const { handleHelpButton } = require('../commands/help');
+               if (await handleHelpButton(interaction)) return;
 
-                const raidConfig = require('../commands/raidconfig');
-                if (await raidConfig.handleButton(interaction)) return;
+               const { handleRaidSummonButton } = require('../systems/raid/raid-ping.system');
+               if (await handleRaidSummonButton(interaction)) return;
 
-                const { handleGawkInteraction } = require('../commands/gawk');
-                if (await handleGawkInteraction(interaction)) return;
+               const raidConfig = require('../commands/raidconfig');
+               if (await raidConfig.handleButton(interaction)) return;
+
+               const { handleGawkInteraction } = require('../commands/gawk');
+               if (await handleGawkInteraction(interaction)) return;
                 
-                // Config toggle handler
-                const { handleConfigToggle } = require('../commands/config');
-                if (await handleConfigToggle(interaction)) return;
+               // Config toggle handler
+               const { handleConfigToggle } = require('../commands/config');
+               if (await handleConfigToggle(interaction)) return;
                 
                 // Server management system handlers
                 const { handleServerViewButton, handlePageButton, handleRefreshButton } = require('../systems/admin/server-management.system');
@@ -139,6 +150,10 @@ module.exports = {
                 }
             } catch (error) {
                 sendError('Error handling button:', error);
+                console.error('[INTERACTION_BUTTON_ERROR]', error);
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: 'There was an error handling this button.', flags: 1 << 6 });
+                }
             }
 
         }

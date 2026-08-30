@@ -63,7 +63,7 @@ module.exports = {
                 return;
             }
             
-            if (content.match(/^help$/i)) {
+            if (content.match(/^(?:help|rhelp)$/i)) {
                 const { handleHelpCommand } = require('../commands/help');
                 await handleHelpCommand(message);
                 return;
@@ -233,6 +233,12 @@ module.exports = {
             }
         }
         
+        if (!message.author.bot && /^rhelp(?:\s|$)/i.test(message.content)) {
+            const { handleHelpCommand } = require('../commands/help');
+            await handleHelpCommand(message);
+            return;
+        }
+
         // Handle prefix commands (r prefix without @Bot mention)
         if (!message.author.bot && message.content.toLowerCase().startsWith('r')) {
             const args = message.content.slice(1).trim().split(/\s+/);
@@ -260,7 +266,7 @@ module.exports = {
             }
             
             // Information commands
-            if (command === 'help') {
+            if (command === 'help' || command === 'rhelp') {
                 const { handleHelpCommand } = require('../commands/help');
                 await handleHelpCommand(message);
                 return;
