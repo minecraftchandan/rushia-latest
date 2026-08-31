@@ -9,6 +9,7 @@ const birthdayData = {
   processed: []
 };
 let dataMessage = null;
+let dataMessages = [];
 let dataLoadPromise = null;
 
 async function loadData(client) {
@@ -23,20 +24,23 @@ async function loadData(client) {
     }
 
     const messages = await channel.messages.fetch({ limit: 100 });
-    dataMessage = messages.find(message =>
+    dataMessages = messages.filter(message =>
       message.author.id === client.user.id && message.content.startsWith(DATA_PREFIX)
-    );
+    ).sort((first, second) => first.createdTimestamp - second.createdTimestamp);
 
-    if (dataMessage) {
-      const parsed = JSON.parse(dataMessage.content.slice(DATA_PREFIX.length));
+    if (dataMessages.length > 0) {
+      dataMessage = dataMessages[0];
+      const storedData = dataMessages
+        .map(message => message.content.slice(DATA_PREFIX.length))
+        .join('');
+      const parsed = JSON.parse(storedData);
       if (parsed && typeof parsed === 'object') {
         birthdayData.roles = parsed.roles && typeof parsed.roles === 'object' ? parsed.roles : {};
         birthdayData.processed = Array.isArray(parsed.processed) ? parsed.processed : [];
       }
     } else {
-      dataMessage = await channel.send({
-        content: `${DATA_PREFIX}${JSON.stringify(birthdayData)}`
-      });
+      dataMessage = await channel.send({ content: `${DATA_PREFIX}${JSON.stringify(birthdayData)}` });
+      dataMessages = [dataMessage];
     }
   })();
 
@@ -50,11 +54,29 @@ async function loadData(client) {
 
 async function saveData(client) {
   await loadData(client);
-  const content = `${DATA_PREFIX}${JSON.stringify(birthdayData)}`;
-  if (content.length > 2000) {
-    throw new Error('Birthday data exceeds Discord message size limit');
+  const serializedData = JSON.stringify(birthdayData);
+  const chunkSize = 2000 - DATA_PREFIX.length;
+  const chunks = [];
+  for (let index = 0; index < serializedData.length; index += chunkSize) {
+    chunks.push(serializedData.slice(index, index + chunkSize));
   }
-  dataMessage = await dataMessage.edit({ content });
+
+  const savedMessages = [];
+  for (let index = 0; index < chunks.length; index++) {
+    const content = `${DATA_PREFIX}${chunks[index]}`;
+    const existingMessage = dataMessages[index];
+    const savedMessage = existingMessage
+      ? await existingMessage.edit({ content })
+      : await dataMessage.channel.send({ content });
+    savedMessages.push(savedMessage);
+  }
+
+  for (let index = chunks.length; index < dataMessages.length; index++) {
+    await dataMessages[index].delete();
+  }
+
+  dataMessages = savedMessages;
+  dataMessage = savedMessages[0];
 }
 
 function getWebhookUrl() {
